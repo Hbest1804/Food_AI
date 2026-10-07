@@ -1,0 +1,7 @@
+{
+  "name": "CulinaAI - Trợ Lý Ẩm Thực Thông Minh & Gợi Ý Món Ăn Cá Nhân Hóa",
+  "description": "Hệ thống trợ lý ẩm thực thông minh tích hợp chatbot AI Gemini tư vấn công thức, đề xuất món ăn theo khẩu vị cá nhân, quản lý dinh dưỡng và hệ thống quản trị chuyên sâu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
