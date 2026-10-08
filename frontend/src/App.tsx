@@ -38,6 +38,10 @@ const MainLayout: React.FC = () => {
     setIsWelcomeIntroOpen,
   } = useApp();
 
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [activeTab]);
+
   return (
     <div className="min-h-screen flex flex-col bg-stone-50/60 text-stone-900 selection:bg-amber-200">
       {/* Top Navbar */}

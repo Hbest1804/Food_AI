@@ -152,105 +152,122 @@ export const RecommendationsView: React.FC = () => {
         </div>
       )}
 
-      {/* Section 1: Top Matched for User */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-teal-700" />
-              </div>
-              <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
-                Món ăn sinh ra dành cho khẩu vị của bạn
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-1 pl-10">
-              Đạt điểm tương thích (% Match Score) cao nhất dựa trên sở thích và bảo vệ dị ứng
-            </p>
+      {/* Dish Recommendations Sections */}
+      {dishes.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-lg mx-auto shadow-sm">
+          <div className="w-16 h-16 rounded-3xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto mb-4">
+            <Sparkles className="w-8 h-8" />
           </div>
+          <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">
+            Chưa có dữ liệu món ăn để phân tích
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Thuật toán cá nhân hóa sẽ tự động tính toán điểm phù hợp (% Match Score) theo khẩu vị và tiêu chuẩn dinh dưỡng ngay khi dữ liệu món ăn được tải từ Cơ sở dữ liệu.
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {topMatchDishes.map(({ dish }) => (
-            <DishCard key={dish.id} dish={dish} />
-          ))}
-        </div>
-      </div>
-
-      {/* Section 2: Under 20 Minutes Quick Meals */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      ) : (
+        <>
+          {/* Section 1: Top Matched for User */}
           <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-teal-700" />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-teal-700" />
+                  </div>
+                  <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
+                    Món ăn sinh ra dành cho khẩu vị của bạn
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 pl-10">
+                  Đạt điểm tương thích (% Match Score) cao nhất dựa trên sở thích và bảo vệ dị ứng
+                </p>
               </div>
-              <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
-                Nhanh gọn dưới 20 phút
-              </h2>
             </div>
-            <p className="text-xs text-slate-500 mt-1 pl-10">
-              Chế biến nhanh cho ngày bận rộn nhưng vẫn vẹn tròn hương vị tươi ngon
-            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {topMatchDishes.map(({ dish }) => (
+                <DishCard key={dish.id} dish={dish} />
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {quickDishes.map((dish) => (
-            <DishCard key={dish.id} dish={dish} />
-          ))}
-        </div>
-      </div>
-
-      {/* Section 3: Low-Calorie & Healthy Meals */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+          {/* Section 2: Under 20 Minutes Quick Meals */}
           <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center">
-                <Leaf className="w-4 h-4 text-emerald-600" />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-teal-700" />
+                  </div>
+                  <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
+                    Nhanh gọn dưới 20 phút
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 pl-10">
+                  Chế biến nhanh cho ngày bận rộn nhưng vẫn vẹn tròn hương vị tươi ngon
+                </p>
               </div>
-              <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
-                Kiểm soát calo & Giữ dáng (Dưới 420 kcal)
-              </h2>
             </div>
-            <p className="text-xs text-slate-500 mt-1 pl-10">
-              Tỷ lệ đạm cao, no lâu và duy trì lượng calo thâm hụt lý tưởng cho vóc dáng
-            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {quickDishes.map((dish) => (
+                <DishCard key={dish.id} dish={dish} />
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {lowCalorieDishes.map((dish) => (
-            <DishCard key={dish.id} dish={dish} />
-          ))}
-        </div>
-      </div>
-
-      {/* Section 4: Cozy Dinner */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+          {/* Section 3: Low-Calorie & Healthy Meals */}
           <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                <Heart className="w-4 h-4 text-rose-500" />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center">
+                    <Leaf className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
+                    Kiểm soát calo & Giữ dáng (Dưới 420 kcal)
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 pl-10">
+                  Tỷ lệ đạm cao, no lâu và duy trì lượng calo thâm hụt lý tưởng cho vóc dáng
+                </p>
               </div>
-              <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
-                Bữa tối ấm cúng gia đình
-              </h2>
             </div>
-            <p className="text-xs text-slate-500 mt-1 pl-10">
-              Món ăn đậm đà, tròn vị truyền thống và dễ dàng kết hợp cho mọi thành viên
-            </p>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {dinnerDishes.map((dish) => (
-            <DishCard key={dish.id} dish={dish} />
-          ))}
-        </div>
-      </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {lowCalorieDishes.map((dish) => (
+                <DishCard key={dish.id} dish={dish} />
+              ))}
+            </div>
+          </div>
+
+          {/* Section 4: Cozy Dinner */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                    <Heart className="w-4 h-4 text-rose-500" />
+                  </div>
+                  <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900">
+                    Bữa tối ấm cúng gia đình
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 pl-10">
+                  Món ăn đậm đà, tròn vị truyền thống và dễ dàng kết hợp cho mọi thành viên
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {dinnerDishes.map((dish) => (
+                <DishCard key={dish.id} dish={dish} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

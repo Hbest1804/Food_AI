@@ -362,17 +362,21 @@ export const BrowseView: React.FC = () => {
             <ChefHat className="w-8 h-8" />
           </div>
           <h3 className="font-serif font-bold text-lg text-slate-900 mb-1">
-            Không tìm thấy món ăn phù hợp
+            {dishes.length === 0 ? 'Chưa có món ăn nào trong hệ thống' : 'Không tìm thấy món ăn phù hợp'}
           </h3>
           <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-            Thử thay đổi từ khóa tìm kiếm hoặc bấm đặt lại bộ lọc để khám phá toàn bộ danh mục ẩm thực.
+            {dishes.length === 0
+              ? 'Hệ thống đã dọn sạch toàn bộ dữ liệu mẫu và sẵn sàng kết nối trực tiếp với Cơ sở dữ liệu.'
+              : 'Thử thay đổi từ khóa tìm kiếm hoặc bấm đặt lại bộ lọc để khám phá toàn bộ danh mục ẩm thực.'}
           </p>
-          <button
-            onClick={resetFilters}
-            className="px-6 py-2.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
-          >
-            Đặt lại tất cả bộ lọc
-          </button>
+          {dishes.length > 0 && (
+            <button
+              onClick={resetFilters}
+              className="px-6 py-2.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+            >
+              Đặt lại tất cả bộ lọc
+            </button>
+          )}
         </div>
       )}
     </div>

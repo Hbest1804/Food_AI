@@ -21,11 +21,15 @@ interface BrowseHeroSectionProps {
 export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreClick }) => {
   const {
     currentUser,
+    dishes,
+    setActiveDishModal,
     setAuthModalType,
     setIsTasteProfileModalOpen,
     setIsFridgeModalOpen,
     setActiveTab,
   } = useApp();
+
+  const featuredDish = dishes.length > 0 ? dishes[0] : null;
 
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-teal-950 to-emerald-950 text-white p-6 sm:p-10 lg:p-12 shadow-xl mb-10 border border-teal-800/40">
@@ -34,17 +38,25 @@ export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreC
       <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none animate-pulse-glow" />
       <div className="absolute top-1/2 left-1/3 w-80 h-80 rounded-full bg-teal-400/10 blur-2xl pointer-events-none" />
 
-
-
       <div className="hidden xl:block absolute top-8 right-8 animate-float-reverse pointer-events-none select-none" style={{ animationDelay: '0.8s' }}>
         <div className="bg-white/95 backdrop-blur-xl px-4 py-2.5 rounded-2xl shadow-xl border border-slate-200/80 flex items-center gap-3 text-xs text-slate-900">
           <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center text-lg shadow-2xs">
-            🍲
+            {featuredDish ? '🍲' : '🌿'}
           </div>
           <div>
-            <div className="font-bold text-slate-900">Phở Bò Tái Lăn</div>
+            <div className="font-bold text-slate-900">
+              {featuredDish ? featuredDish.name : 'Dinh Dưỡng Thông Minh'}
+            </div>
             <div className="text-[11px] text-teal-800 font-semibold flex items-center gap-1">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-500" /> 4.95 ★ (78 đánh giá)
+              {featuredDish ? (
+                <>
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-500" /> {featuredDish.rating} ★ ({featuredDish.ratingCount} đánh giá)
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 text-emerald-600" /> Sẵn sàng kết nối CSDL
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -162,73 +174,109 @@ export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreC
           </div>
         </div>
 
-        {/* Right Column: Visual Showcase Feature Card with serene styling */}
+        {/* Right Column: Visual Showcase Feature Card */}
         <div className="lg:col-span-5 relative flex justify-center">
-          <div className="relative w-full max-w-sm rounded-3xl bg-white text-slate-900 p-5 shadow-2xl border border-slate-200 animate-float" style={{ animationDuration: '7s' }}>
-            {/* Image Preview with badge */}
-            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-4 bg-slate-100 shadow-sm">
-              <img
-                src="https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=800&q=80"
-                alt="Cá hồi áp chảo măng tây sốt bơ chanh"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-3 left-3 px-3 py-1 rounded-xl bg-slate-950/80 backdrop-blur-md text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 border border-white/20">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Món Đề Xuất Hôm Nay</span>
+          {featuredDish ? (
+            <div
+              onClick={() => setActiveDishModal(featuredDish)}
+              className="relative w-full max-w-sm rounded-3xl bg-white text-slate-900 p-5 shadow-2xl border border-slate-200 animate-float cursor-pointer hover:scale-[1.01] transition-transform"
+              style={{ animationDuration: '7s' }}
+            >
+              {/* Image Preview with badge */}
+              <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-4 bg-slate-100 shadow-sm">
+                <img
+                  src={featuredDish.image}
+                  alt={featuredDish.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute top-3 left-3 px-3 py-1 rounded-xl bg-slate-950/80 backdrop-blur-md text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 border border-white/20">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Món Đề Xuất Hôm Nay</span>
+                </div>
+                <div className="absolute bottom-3 right-3 px-3 py-1 rounded-xl bg-teal-800 text-white text-[11px] font-bold shadow-md">
+                  ★ {featuredDish.rating}
+                </div>
               </div>
-              <div className="absolute bottom-3 right-3 px-3 py-1 rounded-xl bg-teal-800 text-white text-[11px] font-bold shadow-md">
-                98% Hợp Gu Bạn
+
+              {/* Card Content Info */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-teal-800">{featuredDish.cuisine}</span>
+                  <span className="flex items-center gap-1 text-slate-600">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" /> {featuredDish.rating} ({featuredDish.ratingCount})
+                  </span>
+                </div>
+
+                <h3 className="font-serif font-bold text-base sm:text-lg text-slate-900 line-clamp-1">
+                  {featuredDish.name}
+                </h3>
+
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-1 text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded-lg">
+                    <Leaf className="w-3.5 h-3.5 text-teal-600" />
+                    <span>{featuredDish.calories} kcal</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-500 font-medium">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{featuredDish.cookTimeMinutes} phút nấu</span>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    {featuredDish.difficulty}
+                  </span>
+                </div>
+              </div>
+
+              {/* Interactive Taste Profile Prompt Pill */}
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-600 font-medium">
+                  {currentUser ? `Chế độ: ${currentUser.tasteProfile.diet}` : 'Chưa lưu khẩu vị riêng?'}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (currentUser) {
+                      setIsTasteProfileModalOpen(true);
+                    } else {
+                      setAuthModalType('register');
+                    }
+                  }}
+                  className="text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1 hover:underline transition-colors cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>{currentUser ? 'Chỉnh sửa' : 'Cài đặt ngay'}</span>
+                </button>
               </div>
             </div>
-
-            {/* Card Content Info */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-teal-800">Âu / Eat Clean</span>
-                <span className="flex items-center gap-1 text-slate-600">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" /> 4.9 (42)
-                </span>
+          ) : (
+            <div
+              className="relative w-full max-w-sm rounded-3xl bg-white/95 backdrop-blur-xl text-slate-900 p-6 shadow-2xl border border-slate-200/80 animate-float text-center"
+              style={{ animationDuration: '7s' }}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-teal-50 text-teal-800 flex items-center justify-center mx-auto mb-4 shadow-2xs">
+                <ChefHat className="w-8 h-8" />
               </div>
-
-              <h3 className="font-serif font-bold text-base sm:text-lg text-slate-900 line-clamp-1">
-                Cá Hồi Áp Chảo Măng Tây Sốt Chanh Bơ
-              </h3>
-
-              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-1 text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded-lg">
-                  <Leaf className="w-3.5 h-3.5 text-teal-600" />
-                  <span>420 kcal</span>
-                </div>
-                <div className="flex items-center gap-1 text-slate-500 font-medium">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>15 phút nấu</span>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                  High Protein
-                </span>
-              </div>
-            </div>
-
-            {/* Interactive Taste Profile Prompt Pill */}
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-medium">
-                {currentUser ? `Chế độ: ${currentUser.tasteProfile.diet}` : 'Chưa lưu khẩu vị riêng?'}
+              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold mb-2">
+                Sẵn sàng kết nối CSDL
               </span>
-              <button
-                onClick={() => {
-                  if (currentUser) {
-                    setIsTasteProfileModalOpen(true);
-                  } else {
-                    setAuthModalType('register');
-                  }
-                }}
-                className="text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1 hover:underline transition-colors cursor-pointer"
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>{currentUser ? 'Chỉnh sửa' : 'Cài đặt ngay'}</span>
-              </button>
+              <h3 className="font-serif font-bold text-lg text-slate-900 mb-2">
+                Kho Công Thức Trống
+              </h3>
+              <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                Đã làm sạch toàn bộ dữ liệu có sẵn. Khi kết nối cơ sở dữ liệu hoặc thêm món trong trang Quản trị, món ăn nổi bật sẽ tự động xuất hiện tại đây.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('chat')}
+                  className="w-full py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-300" />
+                  <span>Hỏi Bếp trưởng AI Gemini</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>

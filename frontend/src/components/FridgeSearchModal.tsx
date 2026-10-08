@@ -38,10 +38,7 @@ export const FridgeSearchModal: React.FC = () => {
     setIsChatOpen,
   } = useApp();
 
-  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([
-    'Ức gà',
-    'Cà chua',
-  ]);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState('');
 
   if (!isFridgeModalOpen) return null;

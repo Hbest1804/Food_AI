@@ -46,10 +46,15 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
   };
 
   useEffect(() => {
@@ -165,23 +170,22 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
 
   const quickPrompts = isGuest
     ? [
-        'Mẹo luộc gà vàng ươm không bị nứt da?',
-        'Cách khử mùi tanh của cá hồi?',
-        'Công thức xào rau xanh giòn ngọt?',
-      ]
+      'Mẹo luộc gà vàng ươm không bị nứt da?',
+      'Cách khử mùi tanh của cá hồi?',
+      'Công thức xào rau xanh giòn ngọt?',
+    ]
     : [
-        `Gợi ý bữa tối dưới ${Math.round((currentUser?.tasteProfile.targetCalories || 1800) / 3)} kcal`,
-        `Thực đơn Eat Clean không có ${currentUser?.tasteProfile.allergies?.[0] || 'dị ứng'}`,
-        'Cách làm nước sốt mè rang thanh đạm tại nhà',
-      ];
+      `Gợi ý bữa tối dưới ${Math.round((currentUser?.tasteProfile.targetCalories || 1800) / 3)} kcal`,
+      `Thực đơn Eat Clean không có ${currentUser?.tasteProfile.allergies?.[0] || 'dị ứng'}`,
+      'Cách làm nước sốt mè rang thanh đạm tại nhà',
+    ];
 
   return (
     <div
-      className={`flex flex-col bg-white overflow-hidden transition-all duration-300 ${
-        isFullPage
-          ? 'h-[calc(100vh-5rem)] max-w-4xl mx-auto rounded-3xl border border-slate-200 shadow-xl my-4'
-          : 'h-[590px] w-full max-w-md rounded-3xl border border-slate-200 shadow-2xl'
-      }`}
+      className={`flex flex-col bg-white overflow-hidden transition-all duration-300 ${isFullPage
+        ? 'h-[calc(100vh-5rem)] max-w-4xl mx-auto rounded-3xl border border-slate-200 shadow-xl my-4'
+        : 'h-[590px] w-full max-w-md rounded-3xl border border-slate-200 shadow-2xl'
+        }`}
     >
       {/* Header with serene forest teal tone */}
       <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-teal-800/40">
@@ -237,7 +241,10 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
       )}
 
       {/* Messages area */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/70">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/70"
+      >
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
           return (
@@ -247,11 +254,10 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
             >
               {/* Avatar */}
               <div
-                className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold shadow-2xs ${
-                  isUser
-                    ? 'bg-teal-800 text-white'
-                    : 'bg-slate-900 text-teal-300 border border-slate-800'
-                }`}
+                className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold shadow-2xs ${isUser
+                  ? 'bg-teal-800 text-white'
+                  : 'bg-slate-900 text-teal-300 border border-slate-800'
+                  }`}
               >
                 {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
               </div>
@@ -259,11 +265,10 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
               {/* Message Bubble */}
               <div className={`max-w-[84%] group flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
-                    isUser
-                      ? 'bg-teal-800 text-white rounded-tr-xs shadow-xs'
-                      : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs'
-                  }`}
+                  className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${isUser
+                    ? 'bg-teal-800 text-white rounded-tr-xs shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs'
+                    }`}
                 >
                   {msg.content}
                 </div>
@@ -289,9 +294,8 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
                       {/* Helpful / Unhelpful buttons */}
                       <button
                         onClick={() => handleFeedback(msg.id, 'helpful')}
-                        className={`hover:text-emerald-600 flex items-center gap-0.5 transition-colors cursor-pointer ${
-                          msg.feedback === 'helpful' ? 'text-emerald-600 font-bold' : ''
-                        }`}
+                        className={`hover:text-emerald-600 flex items-center gap-0.5 transition-colors cursor-pointer ${msg.feedback === 'helpful' ? 'text-emerald-600 font-bold' : ''
+                          }`}
                         title="Hữu ích"
                       >
                         <ThumbsUp className="w-3 h-3" />
@@ -299,9 +303,8 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
 
                       <button
                         onClick={() => handleFeedback(msg.id, 'unhelpful')}
-                        className={`hover:text-rose-600 flex items-center gap-0.5 transition-colors cursor-pointer ${
-                          msg.feedback === 'unhelpful' ? 'text-rose-600 font-bold' : ''
-                        }`}
+                        className={`hover:text-rose-600 flex items-center gap-0.5 transition-colors cursor-pointer ${msg.feedback === 'unhelpful' ? 'text-rose-600 font-bold' : ''
+                          }`}
                         title="Chưa hữu ích"
                       >
                         <ThumbsDown className="w-3 h-3" />
@@ -325,8 +328,6 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
             </div>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Quick Prompts Bar */}
@@ -367,11 +368,10 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
         <button
           type="submit"
           disabled={isLoading || !inputMessage.trim() || (isGuest && guestQueriesRemaining <= 0)}
-          className={`p-2.5 rounded-2xl transition-all shadow-sm cursor-pointer ${
-            isLoading || !inputMessage.trim() || (isGuest && guestQueriesRemaining <= 0)
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              : 'bg-teal-800 hover:bg-teal-900 text-white'
-          }`}
+          className={`p-2.5 rounded-2xl transition-all shadow-sm cursor-pointer ${isLoading || !inputMessage.trim() || (isGuest && guestQueriesRemaining <= 0)
+            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            : 'bg-teal-800 hover:bg-teal-900 text-white'
+            }`}
         >
           <Send className="w-4 h-4" />
         </button>

@@ -7,12 +7,6 @@ import {
   TasteProfile,
   MealHistoryItem,
 } from '../types';
-import {
-  INITIAL_DISHES,
-  INITIAL_USERS,
-  INITIAL_REVIEWS,
-  INITIAL_CHAT_LOGS,
-} from '../data/seedData';
 
 interface AppContextType {
   currentUser: User | null;
@@ -81,51 +75,72 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load state from localStorage or seed data
+  // Khởi tạo state trống, sẵn sàng kết nối CSDL và API backend
+  // Đồng thời dọn dẹp các ID dữ liệu mẫu cũ (dish-*, user-*, rev-*, log-*) nếu còn lưu trong localStorage
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem('culina_users');
-      return saved ? JSON.parse(saved) : INITIAL_USERS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.filter((u: User) => !u.id.startsWith('user-')) : [];
+      }
+      return [];
     } catch {
-      return INITIAL_USERS;
+      return [];
     }
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const savedId = localStorage.getItem('culina_current_user_id');
-      if (savedId === 'guest' || !savedId) return null;
-      const found = INITIAL_USERS.find((u) => u.id === savedId);
-      return found || INITIAL_USERS[0]; // default logged in with demo user
+      if (!savedId || savedId === 'guest' || savedId.startsWith('user-')) return null;
+      const savedUsers = localStorage.getItem('culina_users');
+      if (savedUsers) {
+        const parsed: User[] = JSON.parse(savedUsers);
+        return parsed.find((u) => u.id === savedId) || null;
+      }
+      return null;
     } catch {
-      return INITIAL_USERS[0];
+      return null;
     }
   });
 
   const [dishes, setDishes] = useState<Dish[]>(() => {
     try {
       const saved = localStorage.getItem('culina_dishes');
-      return saved ? JSON.parse(saved) : INITIAL_DISHES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.filter((d: Dish) => !d.id.startsWith('dish-')) : [];
+      }
+      return [];
     } catch {
-      return INITIAL_DISHES;
+      return [];
     }
   });
 
   const [reviews, setReviews] = useState<Review[]>(() => {
     try {
       const saved = localStorage.getItem('culina_reviews');
-      return saved ? JSON.parse(saved) : INITIAL_REVIEWS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.filter((r: Review) => !r.id.startsWith('rev-')) : [];
+      }
+      return [];
     } catch {
-      return INITIAL_REVIEWS;
+      return [];
     }
   });
 
   const [chatLogs, setChatLogs] = useState<ChatLogRecord[]>(() => {
     try {
       const saved = localStorage.getItem('culina_chat_logs');
-      return saved ? JSON.parse(saved) : INITIAL_CHAT_LOGS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed.filter((c: ChatLogRecord) => !c.id.startsWith('log-')) : [];
+      }
+      return [];
     } catch {
-      return INITIAL_CHAT_LOGS;
+      return [];
     }
   });
 
@@ -146,7 +161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isPersonalDataModalOpen, setIsPersonalDataModalOpen] = useState(false);
   const [isFridgeModalOpen, setIsFridgeModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isWelcomeIntroOpen, setIsWelcomeIntroOpen] = useState(true);
+  const [isWelcomeIntroOpen, setIsWelcomeIntroOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'recommendations' | 'chat' | 'admin' | 'auth'>('browse');
 
   const setAuthModalType = (type: 'login' | 'register' | 'forgot' | null) => {
@@ -434,11 +449,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Reviews
   const addReview = (dishId: string, rating: number, comment: string) => {
-    const reviewerName = currentUser ? currentUser.name : 'Khách yêu ẩm thực';
-    const reviewerAvatar = currentUser
-      ? currentUser.avatar
-      : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
-    const reviewerId = currentUser ? currentUser.id : 'guest';
+    if (!currentUser) {
+      setAuthModalType('login');
+      return;
+    }
+    const reviewerName = currentUser.name;
+    const reviewerAvatar = currentUser.avatar;
+    const reviewerId = currentUser.id;
 
     const newReview: Review = {
       id: `rev-${Date.now()}`,

@@ -28,7 +28,6 @@ export const AuthPage: React.FC = () => {
     login,
     register,
     resetPassword,
-    switchAccount,
   } = useApp();
 
   // Mode: 'login' | 'register' | 'forgot'
@@ -387,48 +386,6 @@ export const AuthPage: React.FC = () => {
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
-
-                {/* Quick 1-Click Demo Accounts */}
-                <div className="pt-5 border-t border-slate-100">
-                  <div className="text-xs font-semibold text-slate-500 mb-2.5">
-                    Hoặc đăng nhập nhanh bằng tài khoản mẫu thử nghiệm:
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchAccount('user-1');
-                        setActiveTab('browse');
-                      }}
-                      className="p-3 text-left rounded-2xl border border-teal-200 bg-teal-50/60 hover:bg-teal-100/70 transition-all flex items-center justify-between cursor-pointer"
-                    >
-                      <div>
-                        <div className="font-bold text-xs sm:text-sm text-teal-950">👤 Nguyễn Hoàng Nam</div>
-                        <div className="text-[11px] text-teal-700">Eat Clean · Dị ứng Đậu phộng</div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-teal-200 text-teal-900 rounded-full">
-                        User
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchAccount('user-admin');
-                        setActiveTab('browse');
-                      }}
-                      className="p-3 text-left rounded-2xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100/70 transition-all flex items-center justify-between cursor-pointer"
-                    >
-                      <div>
-                        <div className="font-bold text-xs sm:text-sm text-purple-950">🛡️ Trần Thu Hà</div>
-                        <div className="text-[11px] text-purple-700">Quản trị viên hệ thống</div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-200 text-purple-900 rounded-full">
-                        Admin
-                      </span>
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
 
