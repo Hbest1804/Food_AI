@@ -258,8 +258,8 @@ export async function resetPassword(token, newPassword) {
     throw new Error(`Không thể cập nhật mật khẩu: ${error.message}`);
   }
 
-  // Đăng xuất các session cũ (tuỳ chọn, nhưng khuyến nghị)
-  await supabaseAdmin.auth.admin.signOut(userId);
+  // Supabase tự động revoke toàn bộ session/refresh token cũ khi đổi mật khẩu qua admin.updateUserById()
+  // KHÔNG gọi admin.signOut(userId) — hàm đó nhận JWT string, không nhận UUID.
 
   return { success: true };
 }

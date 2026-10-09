@@ -12,6 +12,10 @@ import {
   resetPassword as resetPasswordService,
 } from '../services/authService.js';
 import { env } from '../config/appConfig.js';
+import { isValidEmail, isStrongPassword } from '../utils/validators.js';
+
+// Thời gian hiệu lực của reset token (phút) — đồng bộ với config Supabase Auth
+const RESET_TOKEN_EXPIRES_MINUTES = 15;
 
 // ── POST /api/auth/register ───────────────────────────────────────────────────
 export async function register(req, res) {
@@ -123,7 +127,7 @@ export async function refresh(req, res) {
 export async function requestPasswordReset(req, res) {
   const { email } = req.body;
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || !isValidEmail(email)) {
     return res.status(422).json({
       success: false,
       error: { code: 'VALIDATION_ERROR', message: 'Email sai định dạng.' }
@@ -163,7 +167,10 @@ export async function verifyPasswordReset(req, res) {
     // hoặc chỉ trả về valid: true)
     return res.status(200).json({
       success: true,
-      data: { valid: result.valid, expires_at: new Date(Date.now() + 15 * 60000).toISOString() }
+      data: {
+        valid: result.valid,
+        expires_at: new Date(Date.now() + RESET_TOKEN_EXPIRES_MINUTES * 60_000).toISOString(),
+      }
     });
   } catch (err) {
     return res.status(400).json({
@@ -184,15 +191,28 @@ export async function resetPassword(req, res) {
     });
   }
 
-  if (!new_password || new_password.length < 8 || new_password !== confirm_password) {
+  // Validate mật khẩu mới: tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số
+  if (!new_password || !isStrongPassword(new_password)) {
     return res.status(422).json({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Mật khẩu yếu hoặc không khớp phần xác nhận.',
         details: [
-          { field: 'new_password', code: 'WEAK_PASSWORD', message: 'Mật khẩu yếu.' },
-          { field: 'confirm_password', code: 'PASSWORD_MISMATCH', message: 'Mật khẩu không khớp.' }
+          { field: 'new_password', code: 'WEAK_PASSWORD', message: 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và chữ số.' },
+        ]
+      }
+    });
+  }
+
+  if (new_password !== confirm_password) {
+    return res.status(422).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Mật khẩu xác nhận không khớp.',
+        details: [
+          { field: 'confirm_password', code: 'PASSWORD_MISMATCH', message: 'Mật khẩu xác nhận không khớp.' },
         ]
       }
     });

@@ -59,14 +59,17 @@ axiosClient.interceptors.response.use(
       window.location.reload();
     }
 
-    // Chuẩn hóa message lỗi
-    const message =
-      error.response?.data?.error ??
-      error.response?.data?.message ??
-      error.message ??
-      'Đã xảy ra lỗi không xác định';
+    // Giữ nguyên cấu trúc lỗi từ API để UI có thể đọc error.code và error.details
+    // (ví dụ: tô đỏ từng ô input sai trong form validation)
+    const apiError = error.response?.data ?? {
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error.message ?? 'Đã xảy ra lỗi không xác định',
+      },
+    };
 
-    return Promise.reject(new Error(message));
+    return Promise.reject(apiError);
   }
 );
 
