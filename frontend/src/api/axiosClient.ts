@@ -3,6 +3,7 @@
 // Tất cả request tới backend đều đi qua file này.
 
 import axios from 'axios';
+import { apiRefreshToken, getStoredRefreshToken } from './authApi';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
@@ -35,11 +36,27 @@ axiosClient.interceptors.response.use(
 
   async (error) => {
     const status = error.response?.status;
+    const originalRequest = error.config;
 
-    if (status === 401) {
-      // Token hết hạn → xóa token và redirect về trang đăng nhập
+    if (status === 401 && !originalRequest._retry && originalRequest.url !== '/api/auth/refresh') {
+      originalRequest._retry = true;
+      try {
+        const refreshToken = getStoredRefreshToken();
+        if (refreshToken) {
+          // Attempt to refresh token
+          const { accessToken } = await apiRefreshToken();
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return axiosClient(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed, fallback to logout
+      }
+
+      // Token hết hạn và không thể refresh → xóa token
       localStorage.removeItem('access_token');
-      window.location.href = '/login';
+      localStorage.removeItem('refresh_token');
+      // Reload nhẹ để reset state context về guest
+      window.location.reload();
     }
 
     // Chuẩn hóa message lỗi

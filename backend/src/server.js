@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './config/appConfig.js';
 import { testDbConnection } from './config/supabase.js';
+import authRoutes from './routes/auth.js';
 
 const app = express();
 
@@ -26,9 +27,8 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// ── Routes (sẽ bổ sung dần) ───────────────────────────────────────────────────
-// import authRoutes from './routes/auth.js';
-// app.use('/api/auth', authRoutes);
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

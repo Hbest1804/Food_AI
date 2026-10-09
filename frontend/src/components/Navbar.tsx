@@ -231,8 +231,8 @@ export const Navbar: React.FC = () => {
 
                       <div className="border-t border-slate-100 pt-1">
                         <button
-                          onClick={() => {
-                            logout();
+                          onClick={async () => {
+                            await logout();
                             setIsUserMenuOpen(false);
                           }}
                           className="w-full text-left px-4 py-2 text-xs sm:text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 font-bold transition-colors cursor-pointer"
