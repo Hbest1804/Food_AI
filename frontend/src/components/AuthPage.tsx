@@ -28,7 +28,9 @@ export const AuthPage: React.FC = () => {
     login,
     register,
     resetPassword,
-    switchAccount,
+    authLoading,
+    authError,
+    setAuthError,
   } = useApp();
 
   // Mode: 'login' | 'register' | 'forgot'
@@ -41,7 +43,6 @@ export const AuthPage: React.FC = () => {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
 
   // Register form state
   const [regName, setRegName] = useState('');
@@ -51,7 +52,6 @@ export const AuthPage: React.FC = () => {
   const [regPhone, setRegPhone] = useState('');
   const [regDiet, setRegDiet] = useState('Eat Clean');
   const [regAllergies, setRegAllergies] = useState<string[]>([]);
-  const [regError, setRegError] = useState('');
 
   // Forgot password flow state
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
@@ -64,40 +64,38 @@ export const AuthPage: React.FC = () => {
   const [resetSuccess, setResetSuccess] = useState(false);
 
   // Handle Login
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
-    const success = login(loginEmail, loginPassword);
-    if (!success) {
-      setLoginError('Email hoặc mật khẩu không chính xác. Bạn có thể bấm chọn tài khoản mẫu bên dưới.');
-    } else {
+    setAuthError(null);
+    const success = await login(loginEmail, loginPassword);
+    if (success) {
       setActiveTab('browse');
     }
+    // authError được set bởi context nếu thất bại
   };
 
   // Handle Register
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegError('');
+    setAuthError(null);
     if (regPassword !== regConfirmPassword) {
-      setRegError('Mật khẩu xác nhận không khớp.');
+      setAuthError('Mật khẩu xác nhận không khớp.');
       return;
     }
     if (regPassword.length < 6) {
-      setRegError('Mật khẩu cần tối thiểu 6 ký tự.');
+      setAuthError('Mật khẩu cần tối thiểu 6 ký tự.');
       return;
     }
 
-    const success = register(regName, regEmail, regPassword, regPhone, {
+    const success = await register(regName, regEmail, regPassword, regPhone, {
       diet: regDiet,
       allergies: regAllergies,
     });
 
-    if (!success) {
-      setRegError('Email này đã được sử dụng. Vui lòng chọn email khác hoặc đăng nhập.');
-    } else {
+    if (success) {
       setActiveTab('browse');
     }
+    // authError được set bởi context nếu thất bại
   };
 
   // Handle Forgot Step 1
@@ -278,7 +276,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     onClick={() => {
                       setAuthModalType('login');
-                      setLoginError('');
+                      setAuthError(null);
                     }}
                     className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                       mode === 'login'
@@ -291,7 +289,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     onClick={() => {
                       setAuthModalType('register');
-                      setRegError('');
+                      setAuthError(null);
                     }}
                     className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                       mode === 'register'
@@ -317,10 +315,10 @@ export const AuthPage: React.FC = () => {
                   </p>
                 </div>
 
-                {loginError && (
+                {authError && mode === 'login' && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs sm:text-sm text-rose-700 flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                    <span>{loginError}</span>
+                    <span>{authError}</span>
                   </div>
                 )}
 
@@ -381,54 +379,25 @@ export const AuthPage: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-teal-900/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                    disabled={authLoading}
+                    className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-teal-900/20 hover:scale-[1.01] disabled:hover:scale-100 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
                   >
-                    <span>Đăng nhập vào CulinaAI</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {authLoading ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                        <span>Đang đăng nhập...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Đăng nhập vào CulinaAI</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
                 </form>
-
-                {/* Quick 1-Click Demo Accounts */}
-                <div className="pt-5 border-t border-slate-100">
-                  <div className="text-xs font-semibold text-slate-500 mb-2.5">
-                    Hoặc đăng nhập nhanh bằng tài khoản mẫu thử nghiệm:
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchAccount('user-1');
-                        setActiveTab('browse');
-                      }}
-                      className="p-3 text-left rounded-2xl border border-teal-200 bg-teal-50/60 hover:bg-teal-100/70 transition-all flex items-center justify-between cursor-pointer"
-                    >
-                      <div>
-                        <div className="font-bold text-xs sm:text-sm text-teal-950">👤 Nguyễn Hoàng Nam</div>
-                        <div className="text-[11px] text-teal-700">Eat Clean · Dị ứng Đậu phộng</div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-teal-200 text-teal-900 rounded-full">
-                        User
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchAccount('user-admin');
-                        setActiveTab('browse');
-                      }}
-                      className="p-3 text-left rounded-2xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100/70 transition-all flex items-center justify-between cursor-pointer"
-                    >
-                      <div>
-                        <div className="font-bold text-xs sm:text-sm text-purple-950">🛡️ Trần Thu Hà</div>
-                        <div className="text-[11px] text-purple-700">Quản trị viên hệ thống</div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-200 text-purple-900 rounded-full">
-                        Admin
-                      </span>
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -444,10 +413,10 @@ export const AuthPage: React.FC = () => {
                   </p>
                 </div>
 
-                {regError && (
+                {authError && mode === 'register' && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs sm:text-sm text-rose-700 flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                    <span>{regError}</span>
+                    <span>{authError}</span>
                   </div>
                 )}
 
@@ -606,10 +575,23 @@ export const AuthPage: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-teal-900/20 hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer mt-4"
+                    disabled={authLoading}
+                    className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-teal-900/20 hover:scale-[1.01] disabled:hover:scale-100 transition-all flex items-center justify-center gap-2 cursor-pointer mt-4"
                   >
-                    <span>Hoàn tất đăng ký & Bắt đầu</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {authLoading ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                        <span>Đang đăng ký...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Hoàn tất đăng ký & Bắt đầu</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
                 </form>
               </div>

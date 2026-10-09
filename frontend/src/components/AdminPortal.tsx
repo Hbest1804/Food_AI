@@ -425,6 +425,14 @@ export const AdminPortal: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+                  {filteredDishes.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-stone-500">
+                        <UtensilsCrossed className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+                        Chưa có món ăn nào trong hệ thống. Bấm "Thêm món ăn mới" ở góc phải để tạo món hoặc đồng bộ từ CSDL.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -540,8 +548,16 @@ export const AdminPortal: React.FC = () => {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+                {users.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-stone-500">
+                        <Users className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+                        Chưa có người dùng nào được đăng ký trong hệ thống.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
           </div>
         </div>
       )}
@@ -638,6 +654,12 @@ export const AdminPortal: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {chatLogs.length === 0 && (
+                <div className="p-12 text-center text-stone-500">
+                  <Bot className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+                  Chưa có nhật ký hội thoại nào được ghi nhận.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -723,27 +745,33 @@ export const AdminPortal: React.FC = () => {
                 Top Món Ăn Được Yêu Thích Nhất
               </h3>
               <div className="space-y-3">
-                {dishes.slice(0, 4).map((d, idx) => (
-                  <div
-                    key={d.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-stone-50 border border-stone-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-bold text-xs flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <div className="font-bold text-xs text-stone-900 line-clamp-1">
-                          {d.name}
-                        </div>
-                        <div className="text-[10px] text-stone-500">{d.cuisine} · {d.calories} kcal</div>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold text-teal-800">
-                      ★ {d.rating}
-                    </span>
+                {dishes.length === 0 ? (
+                  <div className="text-center py-6 text-stone-400 text-xs">
+                    Chưa có món ăn nào trong hệ thống
                   </div>
-                ))}
+                ) : (
+                  dishes.slice(0, 4).map((d, idx) => (
+                    <div
+                      key={d.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-stone-50 border border-stone-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-bold text-xs flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <div className="font-bold text-xs text-stone-900 line-clamp-1">
+                            {d.name}
+                          </div>
+                          <div className="text-[10px] text-stone-500">{d.cuisine} · {d.calories} kcal</div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-teal-800">
+                        ★ {d.rating}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

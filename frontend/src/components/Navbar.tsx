@@ -19,7 +19,6 @@ export const Navbar: React.FC = () => {
     isGuest,
     guestQueriesRemaining,
     logout,
-    switchAccount,
     setAuthModalType,
     setIsTasteProfileModalOpen,
     setIsPersonalDataModalOpen,
@@ -30,7 +29,6 @@ export const Navbar: React.FC = () => {
   } = useApp();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isDemoSwitcherOpen, setIsDemoSwitcherOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-2xs transition-all duration-300">
@@ -138,82 +136,6 @@ export const Navbar: React.FC = () => {
 
           {/* Right Controls */}
           <div className="flex items-center gap-3">
-            {/* Quick Demo Switcher */}
-            <div className="relative">
-              <button
-                onClick={() => setIsDemoSwitcherOpen(!isDemoSwitcherOpen)}
-                className="px-2.5 py-1.5 text-xs bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-200 font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                title="Chuyển nhanh tài khoản để kiểm tra các vai trò và quyền"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>
-                  {currentUser
-                    ? currentUser.role === 'admin'
-                      ? '🛡️ Admin'
-                      : '👤 User mẫu'
-                    : '👀 Khách'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {isDemoSwitcherOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white/95 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95">
-                  <div className="px-3.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Chuyển đổi tài khoản trải nghiệm
-                  </div>
-                  <button
-                    onClick={() => {
-                      switchAccount('user-1');
-                      setIsDemoSwitcherOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-teal-50/60 flex items-center justify-between text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900">Nguyễn Hoàng Nam</div>
-                      <div className="text-[11px] text-slate-500">Eat Clean · Dị ứng Đậu phộng</div>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-bold">User</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchAccount('user-admin');
-                      setIsDemoSwitcherOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-purple-50/60 flex items-center justify-between text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900">Trần Thu Hà</div>
-                      <div className="text-[11px] text-slate-500">Quản trị viên & Bếp trưởng</div>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold">Admin</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchAccount('user-2');
-                      setIsDemoSwitcherOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-emerald-50/60 flex items-center justify-between text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-900">Lê Phương Thảo</div>
-                      <div className="text-[11px] text-slate-500">Ăn chay · Dị ứng Hải sản</div>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">User</span>
-                  </button>
-                  <div className="border-t border-slate-100 my-1"></div>
-                  <button
-                    onClick={() => {
-                      switchAccount('guest');
-                      setIsDemoSwitcherOpen(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-100 text-slate-700 flex items-center gap-2 cursor-pointer"
-                  >
-                    <span>👀 Chế độ Khách (Giới hạn thử nghiệm)</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
             {/* If Logged In: Taste Profile Shortcut & User Profile */}
             {currentUser ? (
               <div className="flex items-center gap-2">
@@ -309,8 +231,8 @@ export const Navbar: React.FC = () => {
 
                       <div className="border-t border-slate-100 pt-1">
                         <button
-                          onClick={() => {
-                            logout();
+                          onClick={async () => {
+                            await logout();
                             setIsUserMenuOpen(false);
                           }}
                           className="w-full text-left px-4 py-2 text-xs sm:text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 font-bold transition-colors cursor-pointer"

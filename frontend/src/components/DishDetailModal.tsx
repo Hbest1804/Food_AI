@@ -26,6 +26,7 @@ export const DishDetailModal: React.FC = () => {
     reviews,
     addReview,
     calculateDishMatchScore,
+    setAuthModalType,
   } = useApp();
 
   const [servings, setServings] = useState<number>(activeDishModal?.servings || 2);
@@ -53,6 +54,11 @@ export const DishDetailModal: React.FC = () => {
 
   const handleReviewSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) {
+      setActiveDishModal(null);
+      setAuthModalType('login');
+      return;
+    }
     if (!newComment.trim()) return;
     addReview(dish.id, newRating, newComment.trim());
     setNewComment('');
@@ -338,62 +344,90 @@ export const DishDetailModal: React.FC = () => {
               Đánh giá & Bình luận từ người nấu ({dishReviews.length})
             </h3>
 
-            {/* Review form */}
-            <form onSubmit={handleReviewSubmit} className="mb-6 p-4 rounded-2xl bg-stone-50 border border-stone-200">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-stone-700">
-                  {currentUser ? `Bạn đang bình luận với tên: ${currentUser.name}` : 'Đánh giá món ăn này'}
-                </span>
-
-                {/* Star rating selector */}
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setNewRating(star)}
-                      className="p-1 focus:outline-hidden hover:scale-110 transition-transform cursor-pointer"
-                    >
-                      <Star
-                        className={`w-5 h-5 ${
-                          star <= newRating
-                            ? 'fill-amber-400 text-amber-500'
-                            : 'text-stone-300'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                  <span className="text-xs font-bold text-stone-700 ml-1.5">
-                    {newRating} sao
+            {/* Review form (Only for authenticated users) */}
+            {currentUser ? (
+              <form onSubmit={handleReviewSubmit} className="mb-6 p-4 rounded-2xl bg-stone-50 border border-stone-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-stone-700">
+                    Bạn đang bình luận với tên: <span className="font-bold text-teal-800">{currentUser.name}</span>
                   </span>
-                </div>
-              </div>
 
-              <div className="relative">
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Chia sẻ cảm nhận về hương vị, mẹo bạn biến tấu khi nấu món này..."
-                  rows={3}
-                  className="w-full text-xs sm:text-sm p-3 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-700 bg-white"
-                  required
-                />
+                  {/* Star rating selector */}
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setNewRating(star)}
+                        className="p-1 focus:outline-hidden hover:scale-110 transition-transform cursor-pointer"
+                      >
+                        <Star
+                          className={`w-5 h-5 ${
+                            star <= newRating
+                              ? 'fill-amber-400 text-amber-500'
+                              : 'text-stone-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    <span className="text-xs font-bold text-stone-700 ml-1.5">
+                      {newRating} sao
+                    </span>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Chia sẻ cảm nhận về hương vị, mẹo bạn biến tấu khi nấu món này..."
+                    rows={3}
+                    className="w-full text-xs sm:text-sm p-3 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-700 bg-white"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="mt-2 px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Gửi đánh giá</span>
+                  </button>
+                </div>
+
+                {hasSubmittedReview && (
+                  <div className="mt-2 text-xs text-emerald-700 font-medium flex items-center gap-1 animate-in fade-in">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Cảm ơn bạn! Đánh giá đã được ghi nhận vào hệ thống.</span>
+                  </div>
+                )}
+              </form>
+            ) : (
+              <div className="mb-6 p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-stone-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-4 h-4 text-amber-700" />
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold text-stone-900">
+                      Đăng nhập để đánh giá & bình luận
+                    </div>
+                    <div className="text-[11px] sm:text-xs text-stone-600">
+                      Tính năng đánh giá sao và chia sẻ trải nghiệm dành riêng cho thành viên đã đăng nhập.
+                    </div>
+                  </div>
+                </div>
                 <button
-                  type="submit"
-                  className="mt-2 px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    setActiveDishModal(null);
+                    setAuthModalType('login');
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Gửi đánh giá</span>
+                  Đăng nhập ngay
                 </button>
               </div>
-
-              {hasSubmittedReview && (
-                <div className="mt-2 text-xs text-emerald-700 font-medium flex items-center gap-1 animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Cảm ơn bạn! Đánh giá đã được ghi nhận vào hệ thống.</span>
-                </div>
-              )}
-            </form>
+            )}
 
             {/* Existing Reviews List */}
             <div className="space-y-3">
