@@ -11,22 +11,13 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { DishCard } from './DishCard';
+import { ingredientsApi, Ingredient } from '../api/ingredientsApi';
 
-const COMMON_FRIDGE_ITEMS = [
-  'Ức gà',
-  'Thịt bò',
-  'Trứng gà',
-  'Cá hồi',
-  'Đậu hũ non',
-  'Cà chua',
-  'Nấm hương',
-  'Măng tây',
-  'Bông cải xanh',
-  'Dưa leo',
-  'Bơ sáp',
-  'Xà lách',
-  'Gạo lứt',
-  'Mì Ý',
+// Dữ liệu ban đầu (fallback) trong trường hợp API chưa có dữ liệu phổ biến
+const FALLBACK_COMMON = [
+  'Ức gà', 'Thịt bò', 'Trứng gà', 'Cá hồi', 'Đậu hũ non',
+  'Cà chua', 'Nấm hương', 'Măng tây', 'Bông cải xanh',
+  'Dưa leo', 'Bơ sáp', 'Xà lách', 'Gạo lứt', 'Mì Ý',
 ];
 
 export const FridgeSearchModal: React.FC = () => {
@@ -40,6 +31,40 @@ export const FridgeSearchModal: React.FC = () => {
 
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState('');
+  const [commonIngredients, setCommonIngredients] = useState<string[]>(FALLBACK_COMMON);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  React.useEffect(() => {
+    if (isFridgeModalOpen) {
+      ingredientsApi.getIngredients({ is_common: true, limit: 20 })
+        .then(res => {
+          if (res.success && res.data?.length > 0) {
+            setCommonIngredients(res.data.map(i => i.name));
+          }
+        })
+        .catch(console.error);
+    }
+  }, [isFridgeModalOpen]);
+
+  React.useEffect(() => {
+    if (customInput.trim().length >= 2) {
+      const delayFn = setTimeout(() => {
+        ingredientsApi.getIngredients({ q: customInput.trim(), limit: 10 })
+          .then(res => {
+            if (res.success) {
+              setSuggestions(res.data.map(i => i.name));
+              setShowSuggestions(true);
+            }
+          })
+          .catch(console.error);
+      }, 300);
+      return () => clearTimeout(delayFn);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [customInput]);
 
   if (!isFridgeModalOpen) return null;
 
@@ -58,7 +83,7 @@ export const FridgeSearchModal: React.FC = () => {
     setCustomInput('');
   };
 
-  // Find matching dishes that contain at least one of the selected ingredients
+  // Tìm các món ăn chứa ít nhất một trong các nguyên liệu đã chọn
   const matchedDishes = dishes.filter((dish) => {
     if (selectedIngredients.length === 0) return false;
     return selectedIngredients.some((ing) =>
@@ -77,7 +102,7 @@ export const FridgeSearchModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
       <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-stone-200">
-        {/* Header */}
+        {/* Phần Header */}
         <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/70">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
@@ -101,15 +126,15 @@ export const FridgeSearchModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Body */}
+        {/* Phần Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          {/* Quick Select Common Fridge Items */}
+          {/* Lựa chọn nhanh nguyên liệu phổ biến */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2">
               Nguyên liệu phổ biến (Nhấn để chọn nhanh):
             </label>
             <div className="flex flex-wrap gap-2">
-              {COMMON_FRIDGE_ITEMS.map((item) => {
+              {commonIngredients.map((item) => {
                 const isSelected = selectedIngredients.includes(item);
                 return (
                   <button
@@ -130,25 +155,51 @@ export const FridgeSearchModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Add custom ingredient input */}
-          <form onSubmit={handleAddCustom} className="flex gap-2">
-            <input
-              type="text"
-              value={customInput}
-              onChange={(e) => setCustomInput(e.target.value)}
-              placeholder="Nhập nguyên liệu khác trong tủ lạnh (vd: súp lơ, hành tây)..."
-              className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl transition-colors flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm</span>
-            </button>
-          </form>
+          {/* Ô nhập nguyên liệu tùy chỉnh */}
+          <div className="relative">
+            <form onSubmit={handleAddCustom} className="flex gap-2 relative z-10">
+              <input
+                type="text"
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                placeholder="Nhập nguyên liệu khác trong tủ lạnh (vd: súp lơ, hành tây)..."
+                className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl transition-colors flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm</span>
+              </button>
+            </form>
 
-          {/* Selected items summary */}
+            {/* Gợi ý Tự động điền (Autocomplete) */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full mt-1 left-0 right-[80px] bg-white border border-stone-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                {suggestions.map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-stone-50 border-b border-stone-100 last:border-0"
+                    onClick={() => {
+                      if (!selectedIngredients.includes(suggestion)) {
+                        setSelectedIngredients(prev => [...prev, suggestion]);
+                      }
+                      setCustomInput('');
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Tóm tắt các nguyên liệu đã chọn */}
           <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-emerald-950">
@@ -182,7 +233,7 @@ export const FridgeSearchModal: React.FC = () => {
             )}
           </div>
 
-          {/* Matched Dishes in library */}
+          {/* Danh sách món ăn phù hợp trong thư viện */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-serif font-bold text-base text-stone-900">
@@ -222,7 +273,7 @@ export const FridgeSearchModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Phần Footer */}
         <div className="p-4 bg-stone-100/80 border-t border-stone-200 flex items-center justify-between">
           <button
             onClick={() => setIsFridgeModalOpen(false)}

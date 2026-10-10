@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { TasteProfile, SpiceLevel } from '../types';
+import { metaApi } from '../api/metaApi';
 import {
   X,
   Sliders,
@@ -63,6 +64,24 @@ export const TasteProfileModal: React.FC = () => {
     currentUser,
     updateTasteProfile,
   } = useApp();
+
+  const [dietOptions, setDietOptions] = useState<string[]>(DIET_OPTIONS);
+  const [allergyOptions, setAllergyOptions] = useState<string[]>(ALLERGY_OPTIONS);
+
+  React.useEffect(() => {
+    if (isTasteProfileModalOpen) {
+      metaApi.getFilters().then(res => {
+        if (res.success && res.data) {
+          if (res.data.diet_types?.length > 0) {
+            setDietOptions(res.data.diet_types.map(d => d.name));
+          }
+          if (res.data.allergen_groups?.length > 0) {
+            setAllergyOptions(res.data.allergen_groups.map(a => a.name));
+          }
+        }
+      }).catch(console.error);
+    }
+  }, [isTasteProfileModalOpen]);
 
   const currentTaste = currentUser?.tasteProfile || {
     name: 'Bạn',
@@ -139,7 +158,7 @@ export const TasteProfileModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-stone-200">
-        {/* Header */}
+        {/* Phần Header */}
         <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/70">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center">
@@ -163,16 +182,16 @@ export const TasteProfileModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
+        {/* Phần Body có thể cuộn được chứa Form */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          {/* Diet Section */}
+          {/* Mục Chế độ ăn uống */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1.5">
               <Utensils className="w-4 h-4 text-teal-700" />
               1. Chế độ ăn uống hiện tại
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {DIET_OPTIONS.map((item) => (
+              {dietOptions.map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -189,7 +208,7 @@ export const TasteProfileModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Allergies Section (Critical safety) */}
+          {/* Mục Dị ứng (An toàn tuyệt đối) */}
           <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200">
             <label className="block text-xs font-bold uppercase tracking-wider text-rose-800 mb-1 flex items-center gap-1.5">
               <AlertOctagon className="w-4 h-4 text-rose-600" />
@@ -199,7 +218,7 @@ export const TasteProfileModal: React.FC = () => {
               Món ăn chứa bất kỳ chất nào dưới đây sẽ bị đánh dấu Cảnh Báo Đỏ và loại bỏ khỏi gợi ý.
             </p>
             <div className="flex flex-wrap gap-2">
-              {ALLERGY_OPTIONS.map((item) => {
+              {allergyOptions.map((item) => {
                 const isSelected = allergies.includes(item);
                 return (
                   <button
@@ -220,7 +239,7 @@ export const TasteProfileModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Disliked Ingredients */}
+          {/* Nguyên liệu không thích */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2">
               3. Món hoặc nguyên liệu kiêng / không thích ăn
@@ -246,7 +265,7 @@ export const TasteProfileModal: React.FC = () => {
               })}
             </div>
 
-            {/* Add custom dislike */}
+            {/* Thêm món kiêng tự do */}
             <form onSubmit={addCustomDislike} className="flex gap-2">
               <input
                 type="text"
@@ -264,7 +283,7 @@ export const TasteProfileModal: React.FC = () => {
             </form>
           </div>
 
-          {/* Spice Tolerance */}
+          {/* Mức độ ăn cay */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-teal-700" />
@@ -288,7 +307,7 @@ export const TasteProfileModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Calories Goal & Health Goal */}
+          {/* Mục tiêu Calo & Thể trạng */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-stone-50 p-4 rounded-2xl border border-stone-200">
             <div>
               <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-stone-700 mb-1">
@@ -330,7 +349,7 @@ export const TasteProfileModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Favorite Cuisines */}
+          {/* Các thể loại ẩm thực yêu thích */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-teal-700" />
@@ -358,7 +377,7 @@ export const TasteProfileModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Water intake target */}
+          {/* Mục tiêu uống nước */}
           <div className="flex items-center justify-between p-3.5 rounded-2xl bg-sky-50/60 border border-sky-200 text-xs text-sky-900">
             <div className="flex items-center gap-2">
               <Droplet className="w-4 h-4 text-sky-600" />
@@ -379,7 +398,7 @@ export const TasteProfileModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Phần Footer */}
         <div className="p-4 bg-stone-100/80 border-t border-stone-200 flex items-center justify-between">
           <button
             onClick={() => setIsTasteProfileModalOpen(false)}

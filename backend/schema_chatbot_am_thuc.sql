@@ -121,6 +121,7 @@ create table ingredients (
   name               text not null unique,
   default_unit       text not null,          -- 'g', 'ml', 'quả', 'thìa canh'...
   allergen_group_id  smallint references allergen_groups(id),
+  is_common          boolean not null default false,  -- nguyên liệu phổ biến cho Tủ lạnh thông minh (F5)
   aliases            text[] not null default '{}',  -- tên gọi khác, hỗ trợ tìm kiếm/nhập liệu
   created_at         timestamptz not null default now()
 );
@@ -307,6 +308,9 @@ create index idx_chat_messages_outcome on chat_messages (outcome, created_at des
 -- Tra cứu điểm trung bình đánh giá theo món
 create index idx_ratings_dish on ratings (dish_id);
 
+-- Lọc nhanh nguyên liệu phổ biến cho Tủ lạnh thông minh (F5)
+create index idx_ingredients_is_common on ingredients (is_common) where is_common;
+
 -- =====================================================================
 -- 8. ROW LEVEL SECURITY (mục 11 tài liệu mô tả hệ thống)
 -- =====================================================================
@@ -334,6 +338,9 @@ alter table ingredients       enable row level security;
 alter table categories        enable row level security;
 alter table tags              enable row level security;
 alter table dish_tags         enable row level security;
+alter table regions           enable row level security;
+alter table diet_types        enable row level security;
+alter table allergen_groups   enable row level security;
 
 -- Dữ liệu cá nhân: chỉ chủ tài khoản được đọc/ghi dữ liệu của chính mình
 create policy self_access on users
@@ -381,6 +388,62 @@ create policy public_read on ingredients      for select using (true);
 create policy public_read on categories       for select using (true);
 create policy public_read on tags             for select using (true);
 create policy public_read on dish_tags        for select using (true);
+create policy public_read on regions          for select using (true);
+create policy public_read on diet_types       for select using (true);
+create policy public_read on allergen_groups  for select using (true);
 
 -- Ghi dữ liệu món ăn / nguyên liệu / danh mục chỉ thực hiện qua service role (backend, F7.1)
 -- -> không cần thêm policy INSERT/UPDATE/DELETE cho các bảng này ở phía client.
+
+-- =====================================================================
+-- 9. DỮ LIỆU TRA CỨU BAN ĐẦU (Seed Data)
+-- =====================================================================
+
+INSERT INTO regions (code, name) VALUES 
+('north', 'Miền Bắc'), ('central', 'Miền Trung'), ('south', 'Miền Nam')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO categories (name, slug) VALUES 
+('Món nước', 'mon-nuoc'), ('Món xào', 'mon-xao'), ('Món kho', 'mon-kho'), 
+('Món canh', 'mon-canh'), ('Món nướng / chiên', 'mon-nuong-chien'), 
+('Món gỏi / nộm', 'mon-goi-nom'), ('Món tráng miệng', 'mon-trang-mieng'), ('Đồ uống', 'do-uong')
+ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO tags (name) VALUES 
+('Cay'), ('Chua ngọt'), ('Thanh đạm'), ('Bổ dưỡng'), 
+('Nhanh gọn'), ('Tiết kiệm'), ('Dễ làm'), ('Đặc sản')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO diet_types (code, name) VALUES 
+('normal', 'Bình thường'), ('eat_clean', 'Eat Clean'), ('vegetarian', 'Ăn chay'), 
+('vegan', 'Thuần chay'), ('keto', 'Keto / Low-Carb'), 
+('high_protein', 'Tăng cơ (High Protein)'), ('low_sugar', 'Tiểu đường / Ít đường')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO allergen_groups (code, name) VALUES 
+('seafood', 'Hải sản có vỏ'), ('peanut', 'Đậu phộng'), ('dairy', 'Sữa bò / Lactose'), 
+('gluten', 'Gluten'), ('egg', 'Trứng'), ('soy', 'Đậu nành'), ('sesame', 'Vừng mè')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO ingredients (name, default_unit, aliases, is_common, allergen_group_id) VALUES 
+('Thịt bò', 'g', '{"thịt bò", "thit bo", "bò"}', true, NULL),
+('Thịt heo', 'g', '{"thịt lợn", "thit heo", "thit lon", "heo", "lợn"}', true, NULL),
+('Thịt gà', 'g', '{"thit ga", "gà"}', true, NULL),
+('Trứng gà', 'quả', '{"trung ga", "trứng"}', true, (SELECT id FROM allergen_groups WHERE code = 'egg')),
+('Tôm', 'g', '{"tom", "tôm sú", "tôm thẻ"}', true, (SELECT id FROM allergen_groups WHERE code = 'seafood')),
+('Cá hồi', 'g', '{"ca hoi"}', false, (SELECT id FROM allergen_groups WHERE code = 'seafood')),
+('Đậu phụ', 'bìa', '{"dau phu", "đậu hũ", "dau hu"}', false, (SELECT id FROM allergen_groups WHERE code = 'soy')),
+('Cà chua', 'quả', '{"ca chua"}', true, NULL),
+('Khoai tây', 'củ', '{"khoai tay"}', true, NULL),
+('Hành tây', 'củ', '{"hanh tay"}', true, NULL),
+('Hành lá', 'nhánh', '{"hanh la"}', true, NULL),
+('Tỏi', 'tép', '{"toi"}', true, NULL),
+('Ớt', 'quả', '{"ot"}', true, NULL),
+('Gừng', 'củ', '{"gung"}', false, NULL),
+('Cà rốt', 'củ', '{"ca rot"}', true, NULL),
+('Nấm hương', 'g', '{"nam huong", "nấm đông cô"}', false, NULL),
+('Rau muống', 'bó', '{"rau muong"}', false, NULL),
+('Bắp cải', 'bắp', '{"bap cai"}', false, NULL),
+('Chanh', 'quả', '{"chanh"}', false, NULL),
+('Nước mắm', 'thìa canh', '{"nuoc mam"}', false, NULL)
+ON CONFLICT (name) DO NOTHING;
