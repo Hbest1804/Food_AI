@@ -22,9 +22,9 @@ export async function registerUser({ email, password, displayName, phone }) {
 
   if (adminError) {
     if (adminError.message.toLowerCase().includes('already been registered') ||
-        adminError.message.toLowerCase().includes('already exists') ||
-        adminError.message.toLowerCase().includes('duplicate key') ||
-        adminError.message.toLowerCase().includes('user already exists')) {
+      adminError.message.toLowerCase().includes('already exists') ||
+      adminError.message.toLowerCase().includes('duplicate key') ||
+      adminError.message.toLowerCase().includes('user already exists')) {
       throw new Error('EMAIL_EXISTS');
     }
     throw new Error(adminError.message);
@@ -243,7 +243,7 @@ export async function verifyResetToken(token) {
 export async function resetPassword(token, newPassword) {
   // Xác thực token trước
   const { data, error: userError } = await supabase.auth.getUser(token);
-  
+
   if (userError || !data.user) {
     throw new Error('INVALID_OR_EXPIRED_TOKEN');
   }
