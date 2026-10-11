@@ -92,6 +92,7 @@ export const Navbar: React.FC = () => {
                 <span>Tủ lạnh thông minh</span>
               </button>
 
+
               <button
                 onClick={() => setActiveTab('chat')}
                 className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
@@ -135,20 +136,20 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* If Logged In: Taste Profile Shortcut & User Profile */}
             {currentUser ? (
               <div className="flex items-center gap-2">
                 {/* Taste Profile Badge Button with Calm Sage Tone */}
                 <button
                   onClick={() => setIsTasteProfileModalOpen(true)}
-                  className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-teal-200/80 bg-teal-50/70 text-teal-950 hover:bg-teal-100/70 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl border border-teal-200/80 bg-teal-50/70 text-teal-950 hover:bg-teal-100/70 transition-all cursor-pointer"
                   title="Chỉnh sửa hồ sơ khẩu vị cá nhân"
                 >
                   <Sliders className="w-3.5 h-3.5 text-teal-700" />
-                  <span className="font-bold">{currentUser.tasteProfile.diet}</span>
+                  <span className="font-bold">{currentUser.tasteProfile?.diet || 'Bình thường'}</span>
                   <span className="text-teal-400">·</span>
-                  <span className="text-slate-600 font-medium">{currentUser.tasteProfile.targetCalories} kcal</span>
+                  <span className="text-slate-600 font-medium">{currentUser.tasteProfile?.targetCalories || 1800} kcal</span>
                 </button>
 
                 {/* User Dropdown */}
@@ -212,7 +213,7 @@ export const Navbar: React.FC = () => {
                           className="w-full text-left px-4 py-2 text-xs sm:text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors cursor-pointer"
                         >
                           <Heart className="w-4 h-4 text-rose-500" />
-                          <span>Món yêu thích ({currentUser.favorites.length})</span>
+                          <span>Món yêu thích ({currentUser.favorites?.length || 0})</span>
                         </button>
 
                         {currentUser.role === 'admin' && (

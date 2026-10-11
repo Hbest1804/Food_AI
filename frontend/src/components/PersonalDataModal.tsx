@@ -13,6 +13,7 @@ import {
   Mail,
   Camera,
   ChefHat,
+  Sliders,
 } from 'lucide-react';
 import { DishCard } from './DishCard';
 
@@ -21,6 +22,7 @@ export const PersonalDataModal: React.FC = () => {
     currentUser,
     isPersonalDataModalOpen,
     setIsPersonalDataModalOpen,
+    setIsTasteProfileModalOpen,
     updateUserProfile,
     dishes,
     deleteMealHistoryItem,
@@ -38,13 +40,15 @@ export const PersonalDataModal: React.FC = () => {
 
   if (!isPersonalDataModalOpen || !currentUser) return null;
 
-  const favoriteDishes = dishes.filter((d) => currentUser.favorites.includes(d.id));
+  const userFavorites = currentUser.favorites || [];
+  const userMealHistory = currentUser.mealHistory || [];
+  const favoriteDishes = dishes.filter((d) => userFavorites.includes(d.id));
 
   // Calculate today's consumed calories
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayMeals = currentUser.mealHistory.filter((m) => m.date === todayStr);
+  const todayMeals = userMealHistory.filter((m) => m.date === todayStr);
   const totalCaloriesToday = todayMeals.reduce((sum, m) => sum + m.calories, 0);
-  const targetCalories = currentUser.tasteProfile.targetCalories || 1800;
+  const targetCalories = currentUser.tasteProfile?.targetCalories || 1800;
   const caloriePercent = Math.min(100, Math.round((totalCaloriesToday / targetCalories) * 100));
 
   const handleProfileSubmit = (e: React.FormEvent) => {
@@ -213,6 +217,28 @@ export const PersonalDataModal: React.FC = () => {
                   </button>
                 </div>
               </form>
+              {/* Shortcut to Taste Profile */}
+              <div className="p-4 rounded-2xl bg-teal-50/80 border border-teal-200 text-xs flex items-center justify-between gap-3">
+                <div>
+                  <span className="font-bold text-teal-950 block">
+                    Hồ sơ khẩu vị & Sở thích ẩm thực
+                  </span>
+                  <span className="text-teal-700 text-[11px]">
+                    Cài đặt vùng miền, chế độ ăn, dị ứng thực phẩm, độ cay/mặn/ngọt, ngân sách mỗi bữa.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPersonalDataModalOpen(false);
+                    setIsTasteProfileModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl font-bold flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Mở khẩu vị</span>
+                </button>
+              </div>
 
               {/* Data Rights Notice */}
               <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-600 leading-relaxed">
@@ -285,12 +311,12 @@ export const PersonalDataModal: React.FC = () => {
               {/* Cooked History list */}
               <div>
                 <h3 className="font-serif font-bold text-base text-stone-900 mb-3">
-                  Lịch sử các món đã nấu ({currentUser.mealHistory.length})
+                  Lịch sử các món đã nấu ({userMealHistory.length})
                 </h3>
 
-                {currentUser.mealHistory.length > 0 ? (
+                {userMealHistory.length > 0 ? (
                   <div className="space-y-2.5">
-                    {currentUser.mealHistory.map((item) => (
+                    {userMealHistory.map((item) => (
                       <div
                         key={item.id}
                         className="p-3 rounded-2xl bg-white border border-stone-200/80 flex items-center justify-between gap-3 hover:border-teal-300 transition-colors"

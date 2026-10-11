@@ -12,6 +12,7 @@ import { PersonalDataModal } from './components/PersonalDataModal';
 import { FridgeSearchModal } from './components/FridgeSearchModal';
 import { AuthPage } from './components/AuthPage';
 import { WelcomeIntroModal } from './components/WelcomeIntroModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   MessageSquare,
   Sparkles,
@@ -202,11 +203,21 @@ const MainLayout: React.FC = () => {
         isOpen={isWelcomeIntroOpen}
         onClose={() => setIsWelcomeIntroOpen(false)}
       />
-      <DishDetailModal />
-      <CookingFocusModeModal />
-      <TasteProfileModal />
-      <PersonalDataModal />
-      <FridgeSearchModal />
+      <ErrorBoundary fallbackTitle="Không thể hiển thị chi tiết món ăn">
+        <DishDetailModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Không thể hiển thị chế độ nấu ăn tập trung">
+        <CookingFocusModeModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Không thể tải hồ sơ khẩu vị & dinh dưỡng">
+        <TasteProfileModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Không thể tải thông tin hồ sơ của bạn">
+        <PersonalDataModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Không thể tải tính năng tìm món từ tủ lạnh">
+        <FridgeSearchModal />
+      </ErrorBoundary>
     </div>
   );
 };

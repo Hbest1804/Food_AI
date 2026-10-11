@@ -27,7 +27,7 @@ export const DishCard: React.FC<DishCardProps> = ({ dish, showMatchScore = true 
   } = useApp();
 
   const [heartPop, setHeartPop] = useState(false);
-  const isFavorite = currentUser?.favorites.includes(dish.id) || false;
+  const isFavorite = currentUser?.favorites?.includes(dish.id) || false;
   const matchInfo = calculateDishMatchScore(dish);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {

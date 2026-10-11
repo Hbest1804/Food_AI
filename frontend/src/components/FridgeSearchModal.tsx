@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   X,
@@ -9,51 +9,60 @@ import {
   ChefHat,
   Search,
   CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Filter,
 } from 'lucide-react';
 import { DishCard } from './DishCard';
 import { ingredientsApi, Ingredient } from '../api/ingredientsApi';
-
-// Dữ liệu ban đầu (fallback) trong trường hợp API chưa có dữ liệu phổ biến
-const FALLBACK_COMMON = [
-  'Ức gà', 'Thịt bò', 'Trứng gà', 'Cá hồi', 'Đậu hũ non',
-  'Cà chua', 'Nấm hương', 'Măng tây', 'Bông cải xanh',
-  'Dưa leo', 'Bơ sáp', 'Xà lách', 'Gạo lứt', 'Mì Ý',
-];
+import { dishesApi, DishListItem } from '../api/dishesApi';
+import { dishListItemToDish } from '../utils/dishAdapter';
+import { Dish } from '../types';
 
 export const FridgeSearchModal: React.FC = () => {
   const {
     isFridgeModalOpen,
     setIsFridgeModalOpen,
-    dishes,
+    openChatWithPrompt,
     setActiveTab,
     setIsChatOpen,
   } = useApp();
 
-  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
+  const [selectedIngredients, setSelectedIngredients] = useState<Ingredient[]>([]);
   const [customInput, setCustomInput] = useState('');
-  const [commonIngredients, setCommonIngredients] = useState<string[]>(FALLBACK_COMMON);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [commonIngredients, setCommonIngredients] = useState<Ingredient[]>([]);
+  const [suggestions, setSuggestions] = useState<Ingredient[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  React.useEffect(() => {
+  // Món ăn khớp từ API /dishes?ingredient_ids=...
+  const [matchedDishes, setMatchedDishes] = useState<Dish[]>([]);
+  const [isLoadingDishes, setIsLoadingDishes] = useState<boolean>(false);
+  const [suggestAi, setSuggestAi] = useState<boolean>(false);
+  const [onlyReadyToCook, setOnlyReadyToCook] = useState<boolean>(false);
+
+  // Lấy danh sách nguyên liệu phổ biến
+  useEffect(() => {
     if (isFridgeModalOpen) {
-      ingredientsApi.getIngredients({ is_common: true, limit: 20 })
-        .then(res => {
+      ingredientsApi
+        .getIngredients({ limit: 30 })
+        .then((res) => {
           if (res.success && res.data?.length > 0) {
-            setCommonIngredients(res.data.map(i => i.name));
+            setCommonIngredients(res.data);
           }
         })
         .catch(console.error);
     }
   }, [isFridgeModalOpen]);
 
-  React.useEffect(() => {
+  // Autocomplete nguyên liệu khi gõ
+  useEffect(() => {
     if (customInput.trim().length >= 2) {
       const delayFn = setTimeout(() => {
-        ingredientsApi.getIngredients({ q: customInput.trim(), limit: 10 })
-          .then(res => {
-            if (res.success) {
-              setSuggestions(res.data.map(i => i.name));
+        ingredientsApi
+          .getIngredients({ q: customInput.trim(), limit: 10 })
+          .then((res) => {
+            if (res.success && res.data) {
+              setSuggestions(res.data);
               setShowSuggestions(true);
             }
           })
@@ -66,46 +75,113 @@ export const FridgeSearchModal: React.FC = () => {
     }
   }, [customInput]);
 
+  // Gọi API /dishes?ingredient_ids=... khi nguyên liệu trong tủ lạnh thay đổi
+  useEffect(() => {
+    if (!isFridgeModalOpen || selectedIngredients.length === 0) {
+      setMatchedDishes([]);
+      setSuggestAi(false);
+      return;
+    }
+
+    const validDbIds = selectedIngredients.filter((i) => i.id > 0).map((i) => i.id);
+    if (validDbIds.length === 0) {
+      setMatchedDishes([]);
+      setSuggestAi(true);
+      return;
+    }
+
+    const ingIds = validDbIds.join(',');
+    setIsLoadingDishes(true);
+
+    const params: any = {
+      ingredient_ids: ingIds,
+      limit: 30,
+    };
+
+    if (onlyReadyToCook) {
+      params.min_match_ratio = 1;
+    }
+
+    dishesApi
+      .getDishes(params)
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map(dishListItemToDish);
+          setMatchedDishes(mapped);
+          setSuggestAi(res.meta?.suggest_ai || mapped.length === 0);
+        }
+      })
+      .catch((err) => {
+        console.error('Lỗi tìm món theo tủ lạnh:', err);
+      })
+      .finally(() => {
+        setIsLoadingDishes(false);
+      });
+  }, [selectedIngredients, onlyReadyToCook, isFridgeModalOpen]);
+
   if (!isFridgeModalOpen) return null;
 
-  const toggleIngredient = (item: string) => {
+  const toggleIngredient = (item: Ingredient) => {
     setSelectedIngredients((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+      prev.some((i) => i.id === item.id)
+        ? prev.filter((i) => i.id !== item.id)
+        : [...prev, item]
     );
   };
 
   const handleAddCustom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customInput.trim()) return;
-    if (!selectedIngredients.includes(customInput.trim())) {
-      setSelectedIngredients((prev) => [...prev, customInput.trim()]);
+
+    // Tìm trong danh mục gợi ý
+    const matched = suggestions.find(
+      (s) => s.name.toLowerCase() === customInput.trim().toLowerCase()
+    );
+
+    if (matched) {
+      if (!selectedIngredients.some((i) => i.id === matched.id)) {
+        setSelectedIngredients((prev) => [...prev, matched]);
+      }
+    } else {
+      // Nguyên liệu nhập tay không có id (theo đặc tả UC02 luồng 1b)
+      const virtualIng: Ingredient = {
+        id: -Date.now(),
+        name: customInput.trim(),
+        default_unit: 'phần',
+      };
+      setSelectedIngredients((prev) => [...prev, virtualIng]);
     }
     setCustomInput('');
   };
 
-  // Tìm các món ăn chứa ít nhất một trong các nguyên liệu đã chọn
-  const matchedDishes = dishes.filter((dish) => {
-    if (selectedIngredients.length === 0) return false;
-    return selectedIngredients.some((ing) =>
-      dish.ingredients.some((dishIng) =>
-        dishIng.name.toLowerCase().includes(ing.toLowerCase())
-      ) ||
-      dish.name.toLowerCase().includes(ing.toLowerCase())
-    );
-  });
-
   const handleAskAIChef = () => {
     setIsFridgeModalOpen(false);
-    setActiveTab('chat');
+    const validDbIds = selectedIngredients.filter((i) => i.id > 0).map((i) => i.id);
+    const customNames = selectedIngredients.filter((i) => i.id <= 0).map((i) => i.name);
+
+    const fridgePayload = {
+      ingredient_ids: validDbIds,
+      custom_ingredients: customNames,
+    };
+
+    if (selectedIngredients.length > 0) {
+      const ingNames = selectedIngredients.map((i) => i.name).join(', ');
+      openChatWithPrompt(
+        `Tôi đang có các nguyên liệu trong tủ lạnh gồm: ${ingNames}. Bạn hãy gợi ý hoặc sáng tạo công thức món ăn mới phù hợp và hướng dẫn chi tiết cách nấu cho tôi nhé!`,
+        fridgePayload
+      );
+    } else {
+      openChatWithPrompt('Gợi ý cho tôi món ăn ngon và dễ nấu hôm nay nhé!');
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-stone-200">
+      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-stone-200">
         {/* Phần Header */}
         <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50/70">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shadow-2xs">
               <Refrigerator className="w-5 h-5 text-emerald-700" />
             </div>
             <div>
@@ -113,14 +189,14 @@ export const FridgeSearchModal: React.FC = () => {
                 Tủ Lạnh Thông Minh (Tìm món & Chống lãng phí)
               </h2>
               <p className="text-xs text-stone-500">
-                Chọn các nguyên liệu bạn đang có sẵn, AI sẽ tìm món hoặc sáng tạo công thức mới
+                Chọn các nguyên liệu bạn đang có sẵn, hệ thống sẽ đối chiếu công thức và xếp hạng món nấu được
               </p>
             </div>
           </div>
 
           <button
             onClick={() => setIsFridgeModalOpen(false)}
-            className="p-2 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
+            className="p-2 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -131,24 +207,24 @@ export const FridgeSearchModal: React.FC = () => {
           {/* Lựa chọn nhanh nguyên liệu phổ biến */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2">
-              Nguyên liệu phổ biến (Nhấn để chọn nhanh):
+              Nguyên liệu có sẵn phổ biến (Nhấn để chọn nhanh):
             </label>
             <div className="flex flex-wrap gap-2">
-              {commonIngredients.map((item) => {
-                const isSelected = selectedIngredients.includes(item);
+              {commonIngredients.slice(0, 15).map((item) => {
+                const isSelected = selectedIngredients.some((i) => i.id === item.id);
                 return (
                   <button
-                    key={item}
+                    key={item.id}
                     type="button"
                     onClick={() => toggleIngredient(item)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
                         : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
                     }`}
                   >
                     {isSelected ? '✓ ' : '+ '}
-                    {item}
+                    {item.name}
                   </button>
                 );
               })}
@@ -162,14 +238,16 @@ export const FridgeSearchModal: React.FC = () => {
                 type="text"
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
-                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                placeholder="Nhập nguyên liệu khác trong tủ lạnh (vd: súp lơ, hành tây)..."
-                className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                placeholder="Nhập nguyên liệu khác trong tủ lạnh (vd: cà chua, tỏi, nước mắm)..."
+                className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-white"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl transition-colors flex items-center gap-1"
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Thêm</span>
@@ -179,20 +257,20 @@ export const FridgeSearchModal: React.FC = () => {
             {/* Gợi ý Tự động điền (Autocomplete) */}
             {showSuggestions && suggestions.length > 0 && (
               <div className="absolute top-full mt-1 left-0 right-[80px] bg-white border border-stone-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
-                {suggestions.map((suggestion, idx) => (
+                {suggestions.map((suggestion) => (
                   <button
-                    key={idx}
+                    key={suggestion.id}
                     type="button"
-                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-stone-50 border-b border-stone-100 last:border-0"
+                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-emerald-50 border-b border-stone-100 last:border-0 cursor-pointer text-stone-800"
                     onClick={() => {
-                      if (!selectedIngredients.includes(suggestion)) {
-                        setSelectedIngredients(prev => [...prev, suggestion]);
+                      if (!selectedIngredients.some((i) => i.id === suggestion.id)) {
+                        setSelectedIngredients((prev) => [...prev, suggestion]);
                       }
                       setCustomInput('');
                       setShowSuggestions(false);
                     }}
                   >
-                    {suggestion}
+                    🔍 <strong>{suggestion.name}</strong> ({suggestion.default_unit})
                   </button>
                 ))}
               </div>
@@ -200,21 +278,21 @@ export const FridgeSearchModal: React.FC = () => {
           </div>
 
           {/* Tóm tắt các nguyên liệu đã chọn */}
-          <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
+          <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-emerald-950">
                 Đang có trong tủ lạnh ({selectedIngredients.length}):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {selectedIngredients.map((item) => (
                   <span
-                    key={item}
+                    key={item.id}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-emerald-900 shadow-2xs"
                   >
-                    {item}
+                    {item.name}
                     <button
                       onClick={() => toggleIngredient(item)}
-                      className="hover:text-rose-600 transition-colors"
+                      className="hover:text-rose-600 transition-colors ml-1 cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -226,12 +304,37 @@ export const FridgeSearchModal: React.FC = () => {
             {selectedIngredients.length > 0 && (
               <button
                 onClick={() => setSelectedIngredients([])}
-                className="text-xs text-rose-600 hover:underline font-medium"
+                className="text-xs text-rose-600 hover:underline font-medium cursor-pointer"
               >
                 Xóa tất cả
               </button>
             )}
           </div>
+
+          {/* Bộ lọc nấu được ngay (min_match_ratio = 1) */}
+          {selectedIngredients.length > 0 && (
+            <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs">
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-stone-500" />
+                <span className="font-semibold text-stone-700">Bộ lọc độ khớp:</span>
+                <label className="flex items-center gap-1.5 ml-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyReadyToCook}
+                    onChange={(e) => setOnlyReadyToCook(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 border-stone-300 cursor-pointer"
+                  />
+                  <span className="text-stone-800 font-medium">
+                    Chỉ hiện món đủ 100% nguyên liệu (Nấu được ngay)
+                  </span>
+                </label>
+              </div>
+
+              <span className="text-[11px] text-stone-500 italic">
+                (Sắp xếp mặc định: Món khớp nhiều nhất trước)
+              </span>
+            </div>
+          )}
 
           {/* Danh sách món ăn phù hợp trong thư viện */}
           <div>
@@ -239,35 +342,69 @@ export const FridgeSearchModal: React.FC = () => {
               <h3 className="font-serif font-bold text-base text-stone-900">
                 Món ăn nấu được từ nguyên liệu trên ({matchedDishes.length})
               </h3>
-
-              <button
-                onClick={handleAskAIChef}
-                className="text-xs text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-200 transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>Nhờ AI sáng tạo món mới từ tủ lạnh</span>
-              </button>
             </div>
 
-            {matchedDishes.length > 0 ? (
+            {isLoadingDishes ? (
+              <div className="py-12 flex flex-col items-center justify-center text-stone-500 gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-emerald-700" />
+                <p className="text-xs font-medium">Đang tìm các món phù hợp với tủ lạnh của bạn...</p>
+              </div>
+            ) : matchedDishes.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {matchedDishes.map((dish) => (
-                  <DishCard key={dish.id} dish={dish} />
+                  <div key={dish.id} className="relative flex flex-col">
+                    {/* Badge tỷ lệ khớp nguyên liệu */}
+                    {dish.match && (
+                      <div className="mb-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          {dish.match.ratio === 1 ? (
+                            <span className="font-bold text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded-md">
+                              ✨ Nấu được ngay! (100%)
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-emerald-900">
+                              Đã có {dish.match.matched_count} nguyên liệu ({Math.round(dish.match.ratio * 100)}%)
+                            </span>
+                          )}
+                        </div>
+                        {dish.match.missing_count > 0 && (
+                          <span className="text-[11px] text-stone-500 line-clamp-1">
+                            Thiếu: {dish.match.missing_ingredients.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    <DishCard dish={dish} />
+                  </div>
                 ))}
               </div>
-            ) : (
-              <div className="p-8 text-center bg-stone-50 rounded-2xl border border-stone-200/80">
-                <ChefHat className="w-8 h-8 text-stone-400 mx-auto mb-2" />
-                <p className="text-xs sm:text-sm text-stone-600 font-medium">
-                  Chưa có công thức cố định khớp hoàn toàn với tổ hợp nguyên liệu này trong thư viện.
+            ) : selectedIngredients.length > 0 ? (
+              <div className="p-8 text-center bg-stone-50 rounded-2xl border border-stone-200/80 space-y-3">
+                <ChefHat className="w-10 h-10 text-stone-400 mx-auto" />
+                <h4 className="font-serif font-bold text-sm text-stone-800">
+                  {onlyReadyToCook
+                    ? 'Không có món nào đủ 100% nguyên liệu này.'
+                    : 'Chưa có công thức cố định khớp với tổ hợp nguyên liệu này trong thư viện.'}
+                </h4>
+                <p className="text-xs text-stone-500 max-w-md mx-auto">
+                  {suggestAi
+                    ? 'Bạn có thể nhờ Trợ lý AI sáng tạo món ăn hoàn toàn mới từ các nguyên liệu đang có trong tủ lạnh!'
+                    : 'Thử thêm các nguyên liệu thông dụng khác hoặc bỏ bộ lọc 100% để xem thêm gợi ý.'}
                 </p>
-                <button
-                  onClick={handleAskAIChef}
-                  className="mt-3 px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition-all"
-                >
-                  <Sparkles className="w-4 h-4 text-emerald-300" />
-                  <span>Hỏi AI Chef công thức biến tấu ngay!</span>
-                </button>
+
+                <div className="pt-2">
+                  <button
+                    onClick={handleAskAIChef}
+                    className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <ChefHat className="w-4 h-4 text-emerald-200" />
+                    <span>Chuyển sang Chatbot AI với nguyên liệu này</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-stone-50 rounded-2xl border border-stone-200 text-stone-500 text-xs">
+                Chọn ít nhất 1 nguyên liệu phía trên để bắt đầu tìm món nấu được từ tủ lạnh của bạn.
               </div>
             )}
           </div>
@@ -277,14 +414,14 @@ export const FridgeSearchModal: React.FC = () => {
         <div className="p-4 bg-stone-100/80 border-t border-stone-200 flex items-center justify-between">
           <button
             onClick={() => setIsFridgeModalOpen(false)}
-            className="px-4 py-2 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-50 rounded-xl border border-stone-300 transition-colors"
+            className="px-4 py-2 text-xs font-semibold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-50 rounded-xl border border-stone-300 transition-colors cursor-pointer"
           >
             Đóng lại
           </button>
 
           <button
             onClick={handleAskAIChef}
-            className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md transition-all flex items-center gap-1.5"
+            className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <ChefHat className="w-4 h-4" />
             <span>Chuyển sang Chatbot AI với nguyên liệu này</span>

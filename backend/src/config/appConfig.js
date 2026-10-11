@@ -15,6 +15,12 @@ for (const key of required) {
   }
 }
 
+function normalizeGeminiModel(m) {
+  if (!m) return 'gemini-3.5-flash-lite';
+  const cleaned = m.trim().toLowerCase().replace(/\s+/g, '-');
+  return cleaned;
+}
+
 export const env = {
   port: parseInt(process.env.PORT ?? '5000', 10),
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -28,6 +34,8 @@ export const env = {
 
   gemini: {
     apiKey: process.env.GEMINI_API_KEY ?? '',
-    model: process.env.GEMINI_MODEL ?? 'gemini-1.5-flash',
+    model: normalizeGeminiModel(process.env.GEMINI_MODEL),
   },
+
+  guestChatLimit: parseInt(process.env.GUEST_CHAT_LIMIT ?? '5', 10),
 };

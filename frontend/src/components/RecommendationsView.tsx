@@ -91,9 +91,9 @@ export const RecommendationsView: React.FC = () => {
 
           <p className="text-xs sm:text-sm text-slate-300 mt-3 leading-relaxed">
             {currentUser
-              ? `Hệ thống phân tích dựa trên chế độ "${currentUser.tasteProfile.diet}", triệt để loại bỏ "${
-                  currentUser.tasteProfile.allergies.join(', ') || 'dị ứng'
-                }", và căn chỉnh chính xác theo mức ${currentUser.tasteProfile.targetCalories} kcal.`
+              ? `Hệ thống phân tích dựa trên chế độ "${currentUser.tasteProfile?.diet || 'Bình thường'}", triệt để loại bỏ "${
+                  currentUser.tasteProfile?.allergies?.join(', ') || 'dị ứng'
+                }", và căn chỉnh chính xác theo mức ${currentUser.tasteProfile?.targetCalories || 1800} kcal.`
               : 'Đăng nhập hoặc chọn tài khoản mẫu để trải nghiệm thuật toán tính toán % điểm tương thích Match Score theo khẩu vị và an toàn dị ứng.'}
           </p>
 
@@ -123,12 +123,21 @@ export const RecommendationsView: React.FC = () => {
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => setAuthModalType('login')}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all cursor-pointer"
-              >
-                Đăng nhập để nhận gợi ý chuẩn gu
-              </button>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={() => setIsTasteProfileModalOpen(true)}
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Sliders className="w-4 h-4 text-emerald-200" />
+                  <span>Thiết lập hồ sơ khẩu vị & dinh dưỡng</span>
+                </button>
+                <button
+                  onClick={() => setAuthModalType('login')}
+                  className="px-5 py-3 bg-white/10 hover:bg-white/15 text-white font-semibold text-xs sm:text-sm rounded-2xl border border-white/20 backdrop-blur-md transition-all cursor-pointer"
+                >
+                  Đăng nhập để đồng bộ
+                </button>
+              </div>
             )}
           </div>
         </div>
