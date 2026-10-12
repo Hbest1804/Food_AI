@@ -55,8 +55,7 @@ axiosClient.interceptors.response.use(
       // Token hết hạn và không thể refresh → xóa token
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
-      // Reload nhẹ để reset state context về guest
-      window.location.reload();
+      window.dispatchEvent(new Event('culina:auth_expired'));
     }
 
     // Giữ nguyên cấu trúc lỗi từ API để UI có thể đọc error.code và error.details

@@ -11,6 +11,8 @@ import {
   LogOut,
   Sliders,
   ChevronDown,
+  Menu,
+  X,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -29,6 +31,7 @@ export const Navbar: React.FC = () => {
   } = useApp();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-2xs transition-all duration-300">
@@ -263,9 +266,115 @@ export const Navbar: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {/* Mobile Menu Toggle Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 rounded-xl text-slate-700 hover:text-teal-800 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Mở danh mục điều hướng"
+              title="Menu"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5 text-teal-800" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Drawer Navigation */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200/90 bg-white/95 backdrop-blur-xl px-4 py-3 space-y-1.5 animate-in slide-in-from-top-2 shadow-lg">
+          <button
+            onClick={() => {
+              setActiveTab('browse');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'browse'
+                ? 'bg-teal-800 text-white shadow-sm'
+                : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <UtensilsCrossed className="w-4 h-4" />
+            <span>Khám phá món ăn</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('recommendations');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'recommendations'
+                ? 'bg-teal-800 text-white shadow-sm'
+                : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>Gợi ý cho bạn</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsFridgeModalOpen(true);
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+          >
+            <Refrigerator className="w-4 h-4 text-teal-700" />
+            <span>Tủ lạnh thông minh</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('chat');
+              setIsMobileMenuOpen(false);
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'chat'
+                ? 'bg-teal-800 text-white shadow-sm'
+                : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="w-4 h-4 text-teal-600" />
+              <span>Trợ lý AI</span>
+            </div>
+            {isGuest && (
+              <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold border border-slate-200">
+                {guestQueriesRemaining} câu
+              </span>
+            )}
+          </button>
+
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => {
+                setActiveTab('admin');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'admin'
+                  ? 'bg-purple-800 text-white shadow-sm'
+                  : 'text-purple-700 hover:bg-purple-50'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-600" />
+              <span>Quản trị hệ thống</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              setIsWelcomeIntroOpen(true);
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-teal-800 hover:bg-teal-50 border border-teal-200/60 transition-all cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+            <span>Giới thiệu CulinaAI</span>
+          </button>
+        </div>
+      )}
     </header>
   );
 };
