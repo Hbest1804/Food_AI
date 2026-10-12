@@ -42,9 +42,20 @@ export interface MetaFiltersResponse {
   data: FilterMeta;
 }
 
+export type RegionItem = MetaRegion;
+export type CategoryItem = MetaCategory;
+
 export const metaApi = {
   getFilters: async (): Promise<MetaFiltersResponse> => {
     const res = await axiosClient.get<MetaFiltersResponse>('/api/meta/filters');
     return res.data;
+  },
+  getRegions: async (): Promise<{ success: boolean; data: MetaRegion[] }> => {
+    const res = await axiosClient.get<MetaFiltersResponse>('/api/meta/filters');
+    return { success: res.data.success, data: res.data.data?.regions || [] };
+  },
+  getCategories: async (): Promise<{ success: boolean; data: MetaCategory[] }> => {
+    const res = await axiosClient.get<MetaFiltersResponse>('/api/meta/filters');
+    return { success: res.data.success, data: res.data.data?.categories || [] };
   },
 };
