@@ -229,17 +229,13 @@ export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreC
               {/* Interactive Taste Profile Prompt Pill */}
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-600 font-medium">
-                  {currentUser ? `Chế độ: ${currentUser.tasteProfile.diet}` : 'Chưa lưu khẩu vị riêng?'}
+                  {currentUser ? `Chế độ: ${currentUser.tasteProfile?.diet || 'Bình thường'}` : 'Chưa lưu khẩu vị riêng?'}
                 </span>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (currentUser) {
-                      setIsTasteProfileModalOpen(true);
-                    } else {
-                      setAuthModalType('register');
-                    }
+                    setIsTasteProfileModalOpen(true);
                   }}
                   className="text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1 hover:underline transition-colors cursor-pointer"
                 >

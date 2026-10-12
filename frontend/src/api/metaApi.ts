@@ -29,19 +29,22 @@ export interface MetaAllergenGroup {
   name: string;
 }
 
+export interface FilterMeta {
+  regions: MetaRegion[];
+  categories: MetaCategory[];
+  tags: MetaTag[];
+  diet_types: MetaDietType[];
+  allergen_groups: MetaAllergenGroup[];
+}
+
 export interface MetaFiltersResponse {
   success: boolean;
-  data: {
-    regions: MetaRegion[];
-    categories: MetaCategory[];
-    tags: MetaTag[];
-    diet_types: MetaDietType[];
-    allergen_groups: MetaAllergenGroup[];
-  };
+  data: FilterMeta;
 }
 
 export const metaApi = {
-  getFilters: (): Promise<MetaFiltersResponse> => {
-    return axiosClient.get('/api/meta/filters');
+  getFilters: async (): Promise<MetaFiltersResponse> => {
+    const res = await axiosClient.get<MetaFiltersResponse>('/api/meta/filters');
+    return res.data;
   },
 };

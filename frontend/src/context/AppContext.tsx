@@ -16,11 +16,17 @@ import {
   clearTokens,
   type AuthUser,
 } from '../api/authApi';
+import { dishesApi, type GetDishesParams } from '../api/dishesApi';
+import { dishListItemToDish, dishDetailItemToDish } from '../utils/dishAdapter';
+import { apiGetGuestQuota } from '../api/chatApi';
+import { apiGetTasteProfile } from '../api/tasteProfileApi';
+import { TasteProfileApiData } from '../types';
 
 interface AppContextType {
   currentUser: User | null;
   isGuest: boolean;
   guestQueriesRemaining: number;
+  setGuestQueriesRemaining: React.Dispatch<React.SetStateAction<number>>;
   dishes: Dish[];
   users: User[];
   reviews: Review[];
@@ -37,12 +43,20 @@ interface AppContextType {
   setIsPersonalDataModalOpen: (open: boolean) => void;
   isFridgeModalOpen: boolean;
   setIsFridgeModalOpen: (open: boolean) => void;
+  chatPendingPrompt: string;
+  setChatPendingPrompt: (prompt: string) => void;
+  chatPendingFridge: { ingredient_ids?: number[]; custom_ingredients?: string[] } | null;
+  setChatPendingFridge: (fridge: { ingredient_ids?: number[]; custom_ingredients?: string[] } | null) => void;
+  openChatWithPrompt: (prompt: string, fridgeContext?: { ingredient_ids?: number[]; custom_ingredients?: string[] }) => void;
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
   isWelcomeIntroOpen: boolean;
   setIsWelcomeIntroOpen: (open: boolean) => void;
   activeTab: 'browse' | 'recommendations' | 'chat' | 'admin' | 'auth';
   setActiveTab: (tab: 'browse' | 'recommendations' | 'chat' | 'admin' | 'auth') => void;
+  tasteProfileApiData: TasteProfileApiData | null;
+  refreshTasteProfile: () => Promise<void>;
+  refreshGuestQuota: () => Promise<void>;
 
   // Auth state
   authLoading: boolean;
@@ -70,6 +84,8 @@ interface AppContextType {
   updateDish: (dish: Dish) => void;
   deleteDish: (dishId: string) => void;
   togglePublishDish: (dishId: string) => void;
+  refreshDishes: (params?: GetDishesParams) => Promise<Dish[]>;
+  openDishDetail: (dishOrSlugOrId: Dish | string) => Promise<void>;
 
   // Reviews
   addReview: (dishId: string, rating: number, comment: string) => void;
@@ -178,9 +194,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isTasteProfileModalOpen, setIsTasteProfileModalOpen] = useState(false);
   const [isPersonalDataModalOpen, setIsPersonalDataModalOpen] = useState(false);
   const [isFridgeModalOpen, setIsFridgeModalOpen] = useState(false);
+  const [chatPendingPrompt, setChatPendingPrompt] = useState<string>('');
+  const [chatPendingFridge, setChatPendingFridge] = useState<{ ingredient_ids?: number[]; custom_ingredients?: string[] } | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isWelcomeIntroOpen, setIsWelcomeIntroOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'recommendations' | 'chat' | 'admin' | 'auth'>('browse');
+  const [tasteProfileApiData, setTasteProfileApiData] = useState<TasteProfileApiData | null>(null);
+
+  const refreshGuestQuota = useCallback(async () => {
+    try {
+      const res = await apiGetGuestQuota();
+      if (res.success && res.data) {
+        setGuestQueriesRemaining(res.data.remaining);
+      }
+    } catch (e) {
+      console.warn('Failed to load guest quota:', e);
+    }
+  }, []);
+
+  const refreshTasteProfile = useCallback(async () => {
+    if (!isTokenStored()) return;
+    try {
+      const res = await apiGetTasteProfile();
+      if (res.success && res.data) {
+        const p = res.data;
+        setTasteProfileApiData(p);
+        setCurrentUser((prev) => {
+          if (!prev) return prev;
+          const dietName = p.diet_types?.[0]?.name || prev.tasteProfile?.diet || 'Bình thường';
+          const allergens = p.allergen_groups?.map((a) => a.name) || prev.tasteProfile?.allergies || [];
+          const spicyMap: Record<number, any> = { 0: 'Không cay', 1: 'Cay nhẹ', 2: 'Cay vừa', 3: 'Cay vừa', 4: 'Rất cay', 5: 'Rất cay' };
+          const spiceLevel = spicyMap[p.taste_prefs?.spicy_level ?? 1] || prev.tasteProfile?.spiceTolerance || 'Cay nhẹ';
+          return {
+            ...prev,
+            tasteProfile: {
+              ...prev.tasteProfile,
+              diet: dietName,
+              allergies: allergens,
+              targetCalories: p.calorie_goal || prev.tasteProfile?.targetCalories || 1800,
+              spiceTolerance: spiceLevel,
+            },
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to load taste profile:', e);
+    }
+  }, []);
+
+  const openChatWithPrompt = useCallback(
+    (prompt: string, fridgeContext?: { ingredient_ids?: number[]; custom_ingredients?: string[] }) => {
+      setChatPendingPrompt(prompt);
+      if (fridgeContext) {
+        setChatPendingFridge(fridgeContext);
+      }
+      setActiveTab('chat');
+      setIsChatOpen(true);
+    },
+    []
+  );
 
   const setAuthModalType = (type: 'login' | 'register' | 'forgot' | null) => {
     setAuthModalTypeState(type);
@@ -261,38 +333,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch {}
         }
 
-        const restoredUser: User = existing ?? {
+        const restoredUser: User = {
           id: apiUser.id,
           email: apiUser.email,
           name: apiUser.displayName,
           role: apiUser.role as 'user' | 'admin',
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(apiUser.displayName)}&background=0D9488&color=fff`,
-          phone: '',
+          avatar: existing?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(apiUser.displayName)}&background=0D9488&color=fff`,
+          phone: existing?.phone || '',
           status: 'active',
-          createdAt: apiUser.createdAt ?? new Date().toISOString(),
+          createdAt: apiUser.createdAt ?? existing?.createdAt ?? new Date().toISOString(),
           tasteProfile: {
             name: apiUser.displayName,
-            diet: 'Bình thường',
-            allergies: [],
-            dislikes: [],
-            spiceTolerance: 'Cay nhẹ',
-            targetCalories: 1800,
-            healthGoal: 'Duy trì vóc dáng & ăn ngon',
-            favoriteCuisines: ['Việt Nam'],
-            waterTargetLiters: 2.0,
-            dailyMealsCount: 3,
+            diet: existing?.tasteProfile?.diet || 'Bình thường',
+            allergies: existing?.tasteProfile?.allergies || [],
+            dislikes: existing?.tasteProfile?.dislikes || [],
+            spiceTolerance: existing?.tasteProfile?.spiceTolerance || 'Cay nhẹ',
+            targetCalories: existing?.tasteProfile?.targetCalories || 1800,
+            healthGoal: existing?.tasteProfile?.healthGoal || 'Duy trì vóc dáng & ăn ngon',
+            favoriteCuisines: existing?.tasteProfile?.favoriteCuisines || ['Việt Nam'],
+            waterTargetLiters: existing?.tasteProfile?.waterTargetLiters || 2.0,
+            dailyMealsCount: existing?.tasteProfile?.dailyMealsCount || 3,
           },
-          favorites: [],
-          mealHistory: [],
+          favorites: existing?.favorites || [],
+          mealHistory: existing?.mealHistory || [],
         };
 
         setCurrentUser(restoredUser);
+        refreshTasteProfile();
       })
       .catch(() => {
         clearTokens();
         setCurrentUser(null);
+        refreshGuestQuota();
       })
       .finally(() => setAuthLoading(false));
+
+    if (!isTokenStored()) {
+      refreshGuestQuota();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -313,29 +391,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch {}
       }
 
-      const loggedInUser: User = existing ?? {
+      const loggedInUser: User = {
         id: result.user.id,
         email: result.user.email,
         name: result.user.displayName,
         role: result.user.role as 'user' | 'admin',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.displayName)}&background=0D9488&color=fff`,
-        phone: '',
+        avatar: existing?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.displayName)}&background=0D9488&color=fff`,
+        phone: existing?.phone || '',
         status: 'active',
-        createdAt: new Date().toISOString(),
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
         tasteProfile: {
           name: result.user.displayName,
-          diet: 'Bình thường',
-          allergies: [],
-          dislikes: [],
-          spiceTolerance: 'Cay nhẹ',
-          targetCalories: 1800,
-          healthGoal: 'Duy trì vóc dáng & ăn ngon',
-          favoriteCuisines: ['Việt Nam'],
-          waterTargetLiters: 2.0,
-          dailyMealsCount: 3,
+          diet: existing?.tasteProfile?.diet || 'Bình thường',
+          allergies: existing?.tasteProfile?.allergies || [],
+          dislikes: existing?.tasteProfile?.dislikes || [],
+          spiceTolerance: existing?.tasteProfile?.spiceTolerance || 'Cay nhẹ',
+          targetCalories: existing?.tasteProfile?.targetCalories || 1800,
+          healthGoal: existing?.tasteProfile?.healthGoal || 'Duy trì vóc dáng & ăn ngon',
+          favoriteCuisines: existing?.tasteProfile?.favoriteCuisines || ['Việt Nam'],
+          waterTargetLiters: existing?.tasteProfile?.waterTargetLiters || 2.0,
+          dailyMealsCount: existing?.tasteProfile?.dailyMealsCount || 3,
         },
-        favorites: [],
-        mealHistory: [],
+        favorites: existing?.favorites || [],
+        mealHistory: existing?.mealHistory || [],
       };
 
       setCurrentUser(loggedInUser);
@@ -483,10 +561,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAuthModalType('login');
       return;
     }
-    const isFav = currentUser.favorites.includes(dishId);
+    const curFavs = currentUser.favorites || [];
+    const isFav = curFavs.includes(dishId);
     const newFavorites = isFav
-      ? currentUser.favorites.filter((id) => id !== dishId)
-      : [...currentUser.favorites, dishId];
+      ? curFavs.filter((id) => id !== dishId)
+      : [...curFavs, dishId];
 
     const updatedUser = {
       ...currentUser,
@@ -507,9 +586,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       mealType,
       calories: dish.calories,
     };
+    const curHistory = currentUser.mealHistory || [];
     const updatedUser = {
       ...currentUser,
-      mealHistory: [newItem, ...currentUser.mealHistory],
+      mealHistory: [newItem, ...curHistory],
     };
     setCurrentUser(updatedUser);
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
@@ -517,9 +597,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteMealHistoryItem = (historyId: string) => {
     if (!currentUser) return;
+    const curHistory = currentUser.mealHistory || [];
     const updatedUser = {
       ...currentUser,
-      mealHistory: currentUser.mealHistory.filter((item) => item.id !== historyId),
+      mealHistory: curHistory.filter((item) => item.id !== historyId),
     };
     setCurrentUser(updatedUser);
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
@@ -536,11 +617,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createdAt: currentUser.createdAt,
       },
       tasteProfile: currentUser.tasteProfile,
-      favoriteDishes: currentUser.favorites.map((id) => {
+      favoriteDishes: (currentUser.favorites || []).map((id) => {
         const d = dishes.find((dish) => dish.id === id);
         return d ? { id: d.id, name: d.name, calories: d.calories } : id;
       }),
-      cookingHistory: currentUser.mealHistory,
+      cookingHistory: currentUser.mealHistory || [],
       exportedAt: new Date().toISOString(),
     };
 
@@ -579,6 +660,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((d) => (d.id === dishId ? { ...d, isPublished: !d.isPublished } : d))
     );
   };
+
+  const refreshDishes = useCallback(async (params?: GetDishesParams): Promise<Dish[]> => {
+    try {
+      const res = await dishesApi.getDishes(params);
+      if (res.success && Array.isArray(res.data)) {
+        const mapped = res.data.map(dishListItemToDish);
+        setDishes(mapped);
+        return mapped;
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách món ăn từ API:', err);
+    }
+    return [];
+  }, []);
+
+  const openDishDetail = useCallback(async (dishOrSlugOrId: Dish | string): Promise<void> => {
+    if (typeof dishOrSlugOrId === 'object' && dishOrSlugOrId !== null) {
+      setActiveDishModal(dishOrSlugOrId);
+    }
+    const idOrSlug =
+      typeof dishOrSlugOrId === 'string'
+        ? dishOrSlugOrId
+        : (dishOrSlugOrId.slug || dishOrSlugOrId.id);
+
+    try {
+      const res = await dishesApi.getDishDetail(idOrSlug);
+      if (res.success && res.data) {
+        const detail = dishDetailItemToDish(res.data);
+        setActiveDishModal(detail);
+      }
+    } catch (err) {
+      console.error('Lỗi tải chi tiết món ăn từ API:', err);
+    }
+  }, []);
+
+  // Tự động tải món ăn từ backend khi ứng dụng khởi chạy
+  useEffect(() => {
+    refreshDishes({ limit: 50 });
+  }, [refreshDishes]);
 
   // Reviews
   const addReview = (dishId: string, rating: number, comment: string) => {
@@ -771,12 +891,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsPersonalDataModalOpen,
         isFridgeModalOpen,
         setIsFridgeModalOpen,
+        chatPendingPrompt,
+        setChatPendingPrompt,
+        chatPendingFridge,
+        setChatPendingFridge,
+        openChatWithPrompt,
         isChatOpen,
         setIsChatOpen,
         isWelcomeIntroOpen,
         setIsWelcomeIntroOpen,
         activeTab,
         setActiveTab,
+        tasteProfileApiData,
+        refreshTasteProfile,
+        refreshGuestQuota,
+        setGuestQueriesRemaining,
 
         login,
         logout,
@@ -796,6 +925,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateDish,
         deleteDish,
         togglePublishDish,
+        refreshDishes,
+        openDishDetail,
 
         addReview,
         logChatQuery,

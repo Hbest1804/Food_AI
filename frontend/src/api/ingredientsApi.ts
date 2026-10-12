@@ -30,7 +30,8 @@ export interface GetIngredientsParams {
 }
 
 export const ingredientsApi = {
-  getIngredients: (params?: GetIngredientsParams): Promise<IngredientsResponse> => {
-    return axiosClient.get('/api/ingredients', { params });
+  getIngredients: async (params?: GetIngredientsParams): Promise<IngredientsResponse> => {
+    const res = await axiosClient.get<IngredientsResponse>('/api/ingredients', { params });
+    return res.data;
   },
 };

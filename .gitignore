@@ -4,3 +4,4 @@ api_targets.txt
 doc_api.txt
 *.sql
 backend/schema_chatbot_am_thuc.sql
+diagram.png

@@ -11,7 +11,10 @@ export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Chưa xác thực. Vui lòng đăng nhập.' });
+    return res.status(401).json({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'Chưa xác thực. Vui lòng đăng nhập.' },
+    });
   }
 
   const token = authHeader.slice(7); // bỏ 'Bearer '
@@ -20,7 +23,10 @@ export async function authenticate(req, res, next) {
     const { data: { user: authUser }, error } = await supabase.auth.getUser(token);
 
     if (error || !authUser) {
-      return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn.' });
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Token không hợp lệ hoặc đã hết hạn.' },
+      });
     }
 
     // Lấy role & status từ bảng users
@@ -31,11 +37,17 @@ export async function authenticate(req, res, next) {
       .single();
 
     if (profileErr || !profile) {
-      return res.status(401).json({ error: 'Tài khoản không tồn tại.' });
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Tài khoản không tồn tại.' },
+      });
     }
 
     if (profile.status === 'locked') {
-      return res.status(403).json({ error: 'Tài khoản đã bị khóa.' });
+      return res.status(403).json({
+        success: false,
+        error: { code: 'ACCOUNT_LOCKED', message: 'Tài khoản đã bị khóa.' },
+      });
     }
 
     // Gắn vào request để các handler tiếp theo dùng

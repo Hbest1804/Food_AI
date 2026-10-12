@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { DishCard } from './DishCard';
 import { BrowseHeroSection } from './BrowseHeroSection';
@@ -10,121 +10,163 @@ import {
   Sparkles,
   RotateCcw,
   ChefHat,
-  Filter,
-  Check,
-  Utensils,
   Leaf,
+  Loader2,
+  Tag,
+  Lightbulb,
 } from 'lucide-react';
+import { dishesApi, DishListItem } from '../api/dishesApi';
+import { metaApi, MetaCategory, MetaRegion } from '../api/metaApi';
+import { dishListItemToDish } from '../utils/dishAdapter';
+import { Dish } from '../types';
 
 export const BrowseView: React.FC = () => {
-  const { dishes, currentUser, setIsFridgeModalOpen } = useApp();
+  const { currentUser, setIsFridgeModalOpen } = useApp();
   const searchFilterRef = useRef<HTMLDivElement>(null);
 
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCuisine, setSelectedCuisine] = useState('Tất cả');
-  const [selectedDiet, setSelectedDiet] = useState('Tất cả');
-  const [selectedMealType, setSelectedMealType] = useState('Tất cả');
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Tất cả');
-  const [selectedCalorieRange, setSelectedCalorieRange] = useState('Tất cả');
-  const [selectedSpice, setSelectedSpice] = useState('Tất cả');
-  const [sortBy, setSortBy] = useState<'rating' | 'fastest' | 'lowCalorie' | 'highProtein'>('rating');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selectedRegionId, setSelectedRegionId] = useState<number | 'all'>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | 'all'>('all');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<'all' | '<15' | '15-30' | '>30'>('all');
+  const [selectedCalorieRange, setSelectedCalorieRange] = useState<'all' | '<300' | '300-500' | '>500'>('all');
+  const [sortBy, setSortBy] = useState<'rating' | 'popular' | 'cook_time' | 'calories' | 'newest' | 'relevance'>('rating');
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
-  // Available options
-  const cuisineList = ['Tất cả', 'Việt Nam', 'Âu / Eat Clean', 'Ăn Chay (Vegetarian)', 'Âu / Pháp', 'Ý / Địa Trung Hải'];
-  const dietList = ['Tất cả', 'Eat Clean', 'Ăn chay', 'Thuần chay', 'Keto / Low-Carb', 'High Protein', 'Bình thường'];
-  const mealTypeList = ['Tất cả', 'Sáng', 'Trưa', 'Tối', 'Bữa phụ / Snack'];
-  const spiceList = ['Tất cả', 'Không cay', 'Cay nhẹ', 'Cay vừa', 'Rất cay'];
+  // Dữ liệu bộ lọc động từ API /meta/filters
+  const [regions, setRegions] = useState<MetaRegion[]>([]);
+  const [categories, setCategories] = useState<MetaCategory[]>([]);
 
-  // Scroll smoothly to search/filter section
+  // Dữ liệu món ăn từ API /dishes
+  const [dishesList, setDishesList] = useState<Dish[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Tải danh mục bộ lọc từ API backend
+  useEffect(() => {
+    metaApi
+      .getFilters()
+      .then((res) => {
+        if (res.success && res.data) {
+          setRegions(res.data.regions || []);
+          setCategories(res.data.categories || []);
+        }
+      })
+      .catch((err) => {
+        console.warn('Không thể tải bộ lọc danh mục từ API:', err);
+      });
+  }, []);
+
+  // Debounce từ khóa tìm kiếm (400ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Cuộn mượt tới khung tìm kiếm & lọc
   const handleScrollToExplore = () => {
     searchFilterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Filter & Sort Logic
-  const filteredDishes = useMemo(() => {
-    return dishes.filter((dish) => {
-      if (!dish.isPublished) return false;
+  // Gọi API GET /dishes theo các tiêu chí lọc
+  const fetchDishes = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params: any = {
+        limit: 50,
+        sort: sortBy,
+      };
 
-      // Text query match (name, description, ingredients)
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchName = dish.name.toLowerCase().includes(q);
-        const matchDesc = dish.description.toLowerCase().includes(q);
-        const matchIng = dish.ingredients.some((i) => i.name.toLowerCase().includes(q));
-        if (!matchName && !matchDesc && !matchIng) return false;
+      if (debouncedQuery) {
+        params.q = debouncedQuery;
+      }
+      if (selectedRegionId !== 'all') {
+        params.region_id = selectedRegionId;
+      }
+      if (selectedCategoryId !== 'all') {
+        params.category_id = selectedCategoryId;
+      }
+      if (selectedDifficulty !== 'all') {
+        params.difficulty = selectedDifficulty;
       }
 
-      // Cuisine match
-      if (selectedCuisine !== 'Tất cả' && dish.cuisine !== selectedCuisine) {
-        return false;
+      // Thời gian nấu
+      if (selectedTimeRange === '<15') {
+        params.max_cook_time = 15;
+      } else if (selectedTimeRange === '15-30') {
+        params.max_cook_time = 30;
       }
 
-      // Diet tag match
-      if (selectedDiet !== 'Tất cả' && !dish.dietTags.includes(selectedDiet)) {
-        return false;
+      // Mức calo
+      if (selectedCalorieRange === '<300') {
+        params.max_calories = 300;
+      } else if (selectedCalorieRange === '300-500') {
+        params.max_calories = 500;
       }
 
-      // Meal type match
-      if (selectedMealType !== 'Tất cả' && !dish.mealType.includes(selectedMealType)) {
-        return false;
+      const res = await dishesApi.getDishes(params);
+      if (res.success && Array.isArray(res.data)) {
+        let items = res.data.map(dishListItemToDish);
+
+        // Lọc cận dưới nếu thời gian nấu >30 hoặc calo >500
+        if (selectedTimeRange === '>30') {
+          items = items.filter((d) => d.cookTimeMinutes > 30);
+        } else if (selectedTimeRange === '15-30') {
+          items = items.filter((d) => d.cookTimeMinutes >= 15);
+        }
+
+        if (selectedCalorieRange === '>500') {
+          items = items.filter((d) => d.calories > 500);
+        } else if (selectedCalorieRange === '300-500') {
+          items = items.filter((d) => d.calories >= 300);
+        }
+
+        setDishesList(items);
+        setTotalCount(res.meta?.total ?? items.length);
+        setSuggestions(res.meta?.suggestions || []);
       }
-
-      // Spice level match
-      if (selectedSpice !== 'Tất cả' && dish.spiceLevel !== selectedSpice) {
-        return false;
-      }
-
-      // Cook time range
-      if (selectedTimeRange === '<15' && dish.cookTimeMinutes > 15) return false;
-      if (selectedTimeRange === '15-30' && (dish.cookTimeMinutes <= 15 || dish.cookTimeMinutes > 30)) return false;
-      if (selectedTimeRange === '>30' && dish.cookTimeMinutes <= 30) return false;
-
-      // Calorie range
-      if (selectedCalorieRange === '<300' && dish.calories >= 300) return false;
-      if (selectedCalorieRange === '300-500' && (dish.calories < 300 || dish.calories > 500)) return false;
-      if (selectedCalorieRange === '>500' && dish.calories <= 500) return false;
-
-      return true;
-    }).sort((a, b) => {
-      if (sortBy === 'rating') return b.rating - a.rating;
-      if (sortBy === 'fastest') return a.cookTimeMinutes - b.cookTimeMinutes;
-      if (sortBy === 'lowCalorie') return a.calories - b.calories;
-      if (sortBy === 'highProtein') return b.protein - a.protein;
-      return 0;
-    });
+    } catch (err) {
+      console.error('Lỗi tải danh sách món ăn từ API:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, [
-    dishes,
-    searchQuery,
-    selectedCuisine,
-    selectedDiet,
-    selectedMealType,
+    debouncedQuery,
+    selectedRegionId,
+    selectedCategoryId,
+    selectedDifficulty,
     selectedTimeRange,
     selectedCalorieRange,
-    selectedSpice,
     sortBy,
   ]);
 
+  useEffect(() => {
+    fetchDishes();
+  }, [fetchDishes]);
+
   const resetFilters = () => {
     setSearchQuery('');
-    setSelectedCuisine('Tất cả');
-    setSelectedDiet('Tất cả');
-    setSelectedMealType('Tất cả');
-    setSelectedTimeRange('Tất cả');
-    setSelectedCalorieRange('Tất cả');
-    setSelectedSpice('Tất cả');
+    setDebouncedQuery('');
+    setSelectedRegionId('all');
+    setSelectedCategoryId('all');
+    setSelectedDifficulty('all');
+    setSelectedTimeRange('all');
+    setSelectedCalorieRange('all');
     setSortBy('rating');
   };
 
   const hasActiveFilters =
-    searchQuery ||
-    selectedCuisine !== 'Tất cả' ||
-    selectedDiet !== 'Tất cả' ||
-    selectedMealType !== 'Tất cả' ||
-    selectedTimeRange !== 'Tất cả' ||
-    selectedCalorieRange !== 'Tất cả' ||
-    selectedSpice !== 'Tất cả';
+    searchQuery !== '' ||
+    selectedRegionId !== 'all' ||
+    selectedCategoryId !== 'all' ||
+    selectedDifficulty !== 'all' ||
+    selectedTimeRange !== 'all' ||
+    selectedCalorieRange !== 'all';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 animate-in fade-in space-y-8">
@@ -144,10 +186,10 @@ export const BrowseView: React.FC = () => {
             Tra Cứu & Lọc Món Ăn
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-2 max-w-xl mx-auto font-normal">
-            Tìm kiếm theo tên món, nguyên liệu có sẵn, hoặc chọn lọc theo thời gian nấu, mức calo và thể loại ẩm thực ưa thích.
+            Tìm kiếm theo tên món, nguyên liệu có sẵn, hoặc chọn lọc theo vùng miền, thời gian nấu, mức calo và thể loại ẩm thực ưa thích.
           </p>
 
-          {/* Serene Search Box with soft teal focus ring */}
+          {/* Search Box */}
           <div className="mt-6 relative max-w-2xl mx-auto">
             <div className="relative flex items-center bg-white rounded-2xl p-1.5 shadow-md shadow-slate-900/5 border border-slate-200 focus-within:border-teal-600 focus-within:ring-3 focus-within:ring-teal-500/20 transition-all duration-300">
               <Search className="w-5 h-5 text-teal-600 ml-3.5 shrink-0" />
@@ -155,7 +197,7 @@ export const BrowseView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm món ăn (Phở bò, Cá hồi, Đậu hũ...) hoặc nguyên liệu (ức gà, nấm, trứng)..."
+                placeholder="Tìm món ăn (Phở bò, Cá hồi, Đậu hũ...) hoặc nguyên liệu (thịt bò, nấm, trứng)..."
                 className="w-full text-xs sm:text-sm px-3 py-2.5 bg-transparent border-0 focus:outline-hidden text-slate-900 font-medium placeholder:text-slate-400"
               />
               {searchQuery && (
@@ -171,6 +213,7 @@ export const BrowseView: React.FC = () => {
                 className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0 cursor-pointer"
                 title="Tìm món từ nguyên liệu có sẵn trong tủ lạnh"
               >
+                <ChefHat className="w-4 h-4 text-emerald-300" />
                 <span>Tủ lạnh</span>
               </button>
             </div>
@@ -178,43 +221,48 @@ export const BrowseView: React.FC = () => {
 
           {/* Quick Suggestion Pills */}
           <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-600 flex-wrap">
-            <span className="font-medium text-slate-400">Gợi ý nhanh:</span>
-            {['Ức gà', 'Cá hồi Na Uy', 'Món chay', 'Dưới 400 kcal', 'Không cay'].map((tag) => (
+            <span className="font-medium text-slate-400">Từ khóa phổ biến:</span>
+            {['Phở bò', 'Cá hồi', 'Thịt bò', 'Canh cà chua', 'Nấm hương'].map((kw) => (
               <button
-                key={tag}
-                onClick={() => {
-                  if (tag === 'Món chay') setSelectedDiet('Ăn chay');
-                  else if (tag === 'Không cay') setSelectedSpice('Không cay');
-                  else if (tag === 'Dưới 400 kcal') setSelectedCalorieRange('<300');
-                  else setSearchQuery(tag);
-                }}
+                key={kw}
+                onClick={() => setSearchQuery(kw)}
                 className="px-3 py-1 rounded-full bg-white hover:bg-teal-50 hover:text-teal-800 text-slate-600 border border-slate-200 text-xs font-medium transition-all shadow-2xs cursor-pointer"
               >
-                {tag}
+                {kw}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Filter Controls Bar with Calm Sage / Teal styling */}
+        {/* Filter Controls Bar */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
-          {/* Row 1: Cuisine Segmented Control */}
+          {/* Row 1: Vùng miền (Region) Segmented Control */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
-                Ẩm thực:
+                Vùng miền:
               </span>
-              {cuisineList.map((c) => (
+              <button
+                onClick={() => setSelectedRegionId('all')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                  selectedRegionId === 'all'
+                    ? 'bg-teal-800 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-800'
+                }`}
+              >
+                Tất cả vùng
+              </button>
+              {regions.map((r) => (
                 <button
-                  key={c}
-                  onClick={() => setSelectedCuisine(c)}
+                  key={r.id}
+                  onClick={() => setSelectedRegionId(r.id)}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                    selectedCuisine === c
+                    selectedRegionId === r.id
                       ? 'bg-teal-800 text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-800'
                   }`}
                 >
-                  {c}
+                  {r.name}
                 </button>
               ))}
             </div>
@@ -224,93 +272,87 @@ export const BrowseView: React.FC = () => {
               className="sm:hidden px-3.5 py-2 text-xs font-semibold bg-slate-100 text-slate-700 rounded-xl flex items-center gap-1.5 border border-slate-200 cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-teal-700" />
-              <span>Bộ lọc</span>
+              <span>Bộ lọc nâng cao</span>
             </button>
           </div>
 
           {/* Row 2: Secondary Dropdowns */}
-          <div className={`grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 border-t border-slate-100 ${
-            showFiltersMobile ? 'block' : 'hidden sm:grid'
-          }`}>
-            {/* Diet dropdown */}
+          <div
+            className={`grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 ${
+              showFiltersMobile ? 'block' : 'hidden sm:grid'
+            }`}
+          >
+            {/* Loại món (Category) dropdown */}
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">
-                Chế độ ăn
+                Loại món
               </label>
               <select
-                value={selectedDiet}
-                onChange={(e) => setSelectedDiet(e.target.value)}
+                value={selectedCategoryId}
+                onChange={(e) =>
+                  setSelectedCategoryId(
+                    e.target.value === 'all' ? 'all' : Number(e.target.value)
+                  )
+                }
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
               >
-                {dietList.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                <option value="all">Tất cả loại món</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {/* Meal type dropdown */}
-            <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">
-                Bữa ăn
-              </label>
-              <select
-                value={selectedMealType}
-                onChange={(e) => setSelectedMealType(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
-              >
-                {mealTypeList.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Time range */}
+            {/* Thời gian nấu */}
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">
                 Thời gian nấu
               </label>
               <select
                 value={selectedTimeRange}
-                onChange={(e) => setSelectedTimeRange(e.target.value)}
+                onChange={(e) => setSelectedTimeRange(e.target.value as any)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
               >
-                <option value="Tất cả">Mọi thời gian</option>
+                <option value="all">Mọi thời gian</option>
                 <option value="<15">Dưới 15 phút</option>
                 <option value="15-30">15 - 30 phút</option>
                 <option value=">30">Trên 30 phút</option>
               </select>
             </div>
 
-            {/* Calorie range */}
+            {/* Độ khó (Difficulty) */}
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">
+                Độ khó
+              </label>
+              <select
+                value={selectedDifficulty}
+                onChange={(e) => setSelectedDifficulty(e.target.value as any)}
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
+              >
+                <option value="all">Tất cả độ khó</option>
+                <option value="easy">Dễ làm</option>
+                <option value="medium">Trung bình</option>
+                <option value="hard">Kỳ công</option>
+              </select>
+            </div>
+
+            {/* Mức Calo */}
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">
                 Mức Calo
               </label>
               <select
                 value={selectedCalorieRange}
-                onChange={(e) => setSelectedCalorieRange(e.target.value)}
+                onChange={(e) => setSelectedCalorieRange(e.target.value as any)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
               >
-                <option value="Tất cả">Mọi mức calo</option>
+                <option value="all">Mọi mức calo</option>
                 <option value="<300">Dưới 300 kcal</option>
                 <option value="300-500">300 - 500 kcal</option>
                 <option value=">500">Trên 500 kcal</option>
-              </select>
-            </div>
-
-            {/* Spice level */}
-            <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1.5">
-                Độ cay
-              </label>
-              <select
-                value={selectedSpice}
-                onChange={(e) => setSelectedSpice(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
-              >
-                {spiceList.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
               </select>
             </div>
           </div>
@@ -318,9 +360,16 @@ export const BrowseView: React.FC = () => {
           {/* Results count & Sort row */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 flex-wrap gap-2 text-xs">
             <div className="flex items-center gap-2 text-slate-600">
-              <span>
-                Tìm thấy <strong className="text-teal-800 text-sm font-bold">{filteredDishes.length}</strong> món ăn
-              </span>
+              {isLoading ? (
+                <div className="flex items-center gap-1.5 text-teal-800 font-semibold">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang truy vấn món ăn...</span>
+                </div>
+              ) : (
+                <span>
+                  Tìm thấy <strong className="text-teal-800 text-sm font-bold">{dishesList.length}</strong> món ăn
+                </span>
+              )}
               {hasActiveFilters && (
                 <button
                   onClick={resetFilters}
@@ -340,9 +389,11 @@ export const BrowseView: React.FC = () => {
                 className="text-xs py-1.5 px-3 rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-800 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden"
               >
                 <option value="rating">Đánh giá cao nhất ★</option>
-                <option value="fastest">Nấu nhanh nhất ⚡</option>
-                <option value="lowCalorie">Ít calo nhất</option>
-                <option value="highProtein">Giàu protein nhất</option>
+                <option value="popular">Phổ biến nhất</option>
+                <option value="cook_time">Nấu nhanh nhất ⚡</option>
+                <option value="calories">Ít calo nhất</option>
+                <option value="newest">Mới nhất</option>
+                <option value="relevance">Độ liên quan</option>
               </select>
             </div>
           </div>
@@ -350,33 +401,64 @@ export const BrowseView: React.FC = () => {
       </div>
 
       {/* Dishes Grid */}
-      {filteredDishes.length > 0 ? (
+      {isLoading ? (
+        <div className="py-20 flex flex-col items-center justify-center text-slate-500 gap-3">
+          <Loader2 className="w-8 h-8 text-teal-700 animate-spin" />
+          <p className="text-xs font-medium">Đang tìm kiếm món ăn từ hệ thống dữ liệu...</p>
+        </div>
+      ) : dishesList.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredDishes.map((dish) => (
+          {dishesList.map((dish) => (
             <DishCard key={dish.id} dish={dish} />
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto shadow-sm">
+        <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center max-w-xl mx-auto shadow-sm">
           <div className="w-16 h-16 rounded-3xl bg-teal-50 text-teal-700 flex items-center justify-center mx-auto mb-4">
             <ChefHat className="w-8 h-8" />
           </div>
           <h3 className="font-serif font-bold text-lg text-slate-900 mb-1">
-            {dishes.length === 0 ? 'Chưa có món ăn nào trong hệ thống' : 'Không tìm thấy món ăn phù hợp'}
+            Không tìm thấy món ăn phù hợp
           </h3>
           <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-            {dishes.length === 0
-              ? 'Hệ thống đã dọn sạch toàn bộ dữ liệu mẫu và sẵn sàng kết nối trực tiếp với Cơ sở dữ liệu.'
-              : 'Thử thay đổi từ khóa tìm kiếm hoặc bấm đặt lại bộ lọc để khám phá toàn bộ danh mục ẩm thực.'}
+            Thử thay đổi từ khóa tìm kiếm hoặc chọn lọc với tiêu chí rộng hơn để khám phá thực đơn.
           </p>
-          {dishes.length > 0 && (
+
+          {/* Suggestions mở rộng tìm kiếm theo UC02 luồng 2a */}
+          {suggestions.length > 0 && (
+            <div className="p-4 bg-teal-50/70 border border-teal-200 rounded-2xl mb-5 text-left">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900 mb-2">
+                <Lightbulb className="w-4 h-4 text-amber-600" />
+                <span>Gợi ý mở rộng tìm kiếm từ hệ thống:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((sug, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSearchQuery(sug)}
+                    className="px-3 py-1 bg-white hover:bg-teal-100 text-teal-900 border border-teal-300 rounded-xl text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                  >
+                    🔍 {sug}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-center gap-3">
             <button
               onClick={resetFilters}
-              className="px-6 py-2.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
             >
               Đặt lại tất cả bộ lọc
             </button>
-          )}
+            <button
+              onClick={() => setIsFridgeModalOpen(true)}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+            >
+              Mở Tủ lạnh thông minh
+            </button>
+          </div>
         </div>
       )}
     </div>

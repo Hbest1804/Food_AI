@@ -45,6 +45,19 @@ export interface Dish {
   rating: number;
   ratingCount: number;
   isPublished: boolean;
+  slug?: string;
+  region?: { id: number; name: string } | null;
+  category?: { id: number; name: string } | null;
+  tags?: Array<{ id: number; name: string }>;
+  estCost?: number | null;
+  favoriteCount?: number;
+  isFavorite?: boolean;
+  match?: {
+    matched_count: number;
+    missing_count: number;
+    ratio: number;
+    missing_ingredients: string[];
+  };
 }
 
 export interface Review {
@@ -101,7 +114,84 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   suggestedDishes?: string[];
+  dishes?: Array<{
+    id: string;
+    name: string;
+    slug?: string;
+    image_url?: string;
+    description?: string;
+    cook_time_minutes?: number;
+    difficulty?: string;
+  }>;
+  replyType?: 'recipe' | 'general' | 'out_of_scope';
   feedback?: 'helpful' | 'unhelpful' | null;
+}
+
+export interface GuestQuota {
+  limit: number;
+  used: number;
+  remaining: number;
+  resets_at: string;
+}
+
+export interface GuestChatResponse {
+  guest_id: string;
+  reply: {
+    type: 'recipe' | 'general' | 'out_of_scope';
+    content: string;
+    dishes: Array<{
+      id: string;
+      name: string;
+      slug?: string;
+      image_url?: string;
+      description?: string;
+      cook_time_minutes?: number;
+      difficulty?: string;
+    }>;
+  };
+  quota: GuestQuota;
+}
+
+export interface TasteProfileApiData {
+  preferred_region_id: number | null;
+  taste_prefs: {
+    spicy_level: number;
+    salty_level: number;
+    sweet_level: number;
+    sour_level: number;
+    liked_ingredient_ids: number[];
+  };
+  calorie_goal: number | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  household_size: number;
+  diet_type_ids: number[];
+  allergen_group_ids: number[];
+  disliked_ingredient_ids: number[];
+  preferred_region: { id: number; name: string } | null;
+  diet_types: Array<{ id: number; name: string }>;
+  allergen_groups: Array<{ id: number; name: string }>;
+  disliked_ingredients: Array<{ id: number; name: string }>;
+  completeness: number;
+  updated_at: string | null;
+}
+
+export interface SaveTasteProfilePayload {
+  preferred_region_id?: number | null;
+  taste_prefs?: {
+    spicy_level?: number;
+    salty_level?: number;
+    sweet_level?: number;
+    sour_level?: number;
+    liked_ingredient_ids?: number[];
+  };
+  calorie_goal?: number | null;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  household_size?: number;
+  diet_type_ids?: number[];
+  allergen_group_ids?: number[];
+  disliked_ingredient_ids?: number[];
 }
 
 export interface ChatLogRecord {
