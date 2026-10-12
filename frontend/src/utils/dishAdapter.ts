@@ -29,7 +29,7 @@ export function dishListItemToDish(item: DishListItem): Dish {
     spiceLevel: 'Không cay' as SpiceLevel,
     allergenWarnings: [],
     servings: 2,
-    image: item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
+    image: item.image_url || (item as any).image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
     ingredients: [],
     steps: [],
     chefTips: [],

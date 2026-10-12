@@ -152,6 +152,30 @@ export const RecommendationsView: React.FC = () => {
     loadRecommendations(false);
   }, [loadRecommendations]);
 
+  const handleToggleFavorite = useCallback(
+    (dishId: string) => {
+      toggleFavorite(dishId);
+      setRecommendations((prev) =>
+        prev.map((item) => {
+          if (item.dish.id === dishId) {
+            const isCurrentlyFav = currentUser ? (currentUser.favorites?.includes(dishId) ?? false) : false;
+            const nextFav = !isCurrentlyFav;
+            return {
+              ...item,
+              dish: {
+                ...item.dish,
+                is_favorite: nextFav,
+                favorite_count: Math.max(0, (item.dish.favorite_count || 0) + (nextFav ? 1 : -1)),
+              },
+            };
+          }
+          return item;
+        })
+      );
+    },
+    [currentUser, toggleFavorite]
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in space-y-8">
       {/* Hero Recommendation Header */}
@@ -159,7 +183,7 @@ export const RecommendationsView: React.FC = () => {
         <div className="absolute top-0 right-0 -mt-16 -mr-16 w-80 h-80 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-10 -mb-16 w-60 h-60 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-3xl">
+        <div className="relative z-10 max-w-4xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-900/70 backdrop-blur-md text-emerald-200 text-xs font-semibold mb-3 border border-teal-500/30">
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
             <span>Gợi Ý Cá Nhân Hóa Dinh Dưỡng (UC08)</span>
@@ -217,6 +241,41 @@ export const RecommendationsView: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Ngữ cảnh cá nhân hóa đang áp dụng theo UC08 */}
+          {currentUser && (
+            <div className="mt-6 pt-5 border-t border-teal-800/50 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-teal-950/50 backdrop-blur-md p-2.5 rounded-xl border border-teal-700/30">
+                <span className="text-[10px] text-teal-300 block uppercase font-semibold">Chế độ ăn</span>
+                <span className="font-bold text-white text-xs truncate block">
+                  {currentUser.tasteProfile?.diet || 'Bình thường'}
+                </span>
+              </div>
+              <div className="bg-teal-950/50 backdrop-blur-md p-2.5 rounded-xl border border-teal-700/30">
+                <span className="text-[10px] text-teal-300 block uppercase font-semibold">Mục tiêu Calo</span>
+                <span className="font-bold text-emerald-300 text-xs">
+                  {currentUser.tasteProfile?.targetCalories || 1800} kcal/ngày
+                </span>
+              </div>
+              <div className="bg-teal-950/50 backdrop-blur-md p-2.5 rounded-xl border border-teal-700/30">
+                <span className="text-[10px] text-teal-300 block uppercase font-semibold">Chiến lược</span>
+                <span className="font-bold text-white text-xs">
+                  {meta?.strategy === 'personalized' ? '🎯 Cá nhân hóa (UC08)' : '🌟 Phổ biến (Luồng 3a)'}
+                </span>
+              </div>
+              <div className="bg-teal-950/50 backdrop-blur-md p-2.5 rounded-xl border border-teal-700/30">
+                <span className="text-[10px] text-teal-300 block uppercase font-semibold">Bảo vệ dị ứng</span>
+                <span
+                  className="font-bold text-emerald-300 text-xs truncate block"
+                  title={currentUser.tasteProfile?.allergies?.join(', ') || 'Không có dị ứng'}
+                >
+                  {currentUser.tasteProfile?.allergies?.length
+                    ? `🛡️ ${currentUser.tasteProfile.allergies.join(', ')}`
+                    : '🛡️ Không có'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -388,7 +447,9 @@ export const RecommendationsView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {recommendations.map((item) => {
             const dish = dishListItemToDish(item.dish);
-            const isFav = dish.isFavorite || currentUser?.favorites?.includes(dish.id);
+            const isFav = currentUser
+              ? (currentUser.favorites?.includes(dish.id) ?? false)
+              : (dish.isFavorite ?? false);
 
             return (
               <div
@@ -409,7 +470,7 @@ export const RecommendationsView: React.FC = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleFavorite(dish.id);
+                      handleToggleFavorite(dish.id);
                     }}
                     className={`absolute top-3 right-3 p-2.5 rounded-2xl backdrop-blur-md transition-all duration-300 cursor-pointer ${
                       isFav
