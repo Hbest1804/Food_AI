@@ -124,7 +124,10 @@ export interface ChatMessage {
     difficulty?: string;
   }>;
   replyType?: 'recipe' | 'general' | 'out_of_scope';
-  feedback?: 'helpful' | 'unhelpful' | null;
+  outcome?: 'answered' | 'no_match' | 'out_of_scope' | 'fallback';
+  tokens?: number | null;
+  feedback?: 'like' | 'dislike' | 'helpful' | 'unhelpful' | null;
+  feedback_reason?: string | null;
 }
 
 export interface GuestQuota {
