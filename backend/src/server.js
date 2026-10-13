@@ -11,6 +11,7 @@ import ingredientsRoutes from './routes/ingredients.js';
 import dishesRoutes from './routes/dishes.js';
 import chatRoutes from './routes/chat.js';
 import meRoutes from './routes/me.js';
+import ratingsRoutes from './routes/ratings.js';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/ingredients', ingredientsRoutes);
 app.use('/api/dishes', dishesRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/me', meRoutes);
+app.use('/api/ratings', ratingsRoutes);
 
 // Hỗ trợ trực tiếp không tiền tố /api
 app.use('/meta', metaRoutes);
@@ -46,6 +48,7 @@ app.use('/ingredients', ingredientsRoutes);
 app.use('/dishes', dishesRoutes);
 app.use('/chat', chatRoutes);
 app.use('/me', meRoutes);
+app.use('/ratings', ratingsRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

@@ -114,6 +114,14 @@ export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreC
             </button>
 
             <button
+              onClick={() => setActiveTab('recommendations')}
+              className="px-5 py-3.5 rounded-2xl bg-teal-800/80 hover:bg-teal-700 text-white font-semibold text-xs sm:text-sm border border-teal-400/30 backdrop-blur-md hover:scale-102 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-300" />
+              <span>Gợi ý cho bạn</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('chat')}
               className="px-5 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs sm:text-sm border border-white/20 backdrop-blur-md hover:scale-102 transition-all flex items-center gap-2 cursor-pointer"
             >

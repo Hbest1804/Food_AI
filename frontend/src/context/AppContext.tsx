@@ -20,6 +20,7 @@ import { dishesApi, type GetDishesParams } from '../api/dishesApi';
 import { dishListItemToDish, dishDetailItemToDish } from '../utils/dishAdapter';
 import { apiGetGuestQuota } from '../api/chatApi';
 import { apiGetTasteProfile } from '../api/tasteProfileApi';
+import { engagementApi } from '../api/engagementApi';
 import { TasteProfileApiData } from '../types';
 
 interface AppContextType {
@@ -198,7 +199,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [chatPendingFridge, setChatPendingFridge] = useState<{ ingredient_ids?: number[]; custom_ingredients?: string[] } | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isWelcomeIntroOpen, setIsWelcomeIntroOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'browse' | 'recommendations' | 'chat' | 'admin' | 'auth'>('browse');
+  const [activeTab, setActiveTabState] = useState<'browse' | 'recommendations' | 'chat' | 'admin' | 'auth'>(() => {
+    try {
+      const hash = window.location.hash.replace('#', '');
+      if (['browse', 'recommendations', 'chat', 'admin', 'auth'].includes(hash)) {
+        return hash as any;
+      }
+      const saved = localStorage.getItem('culina_active_tab');
+      if (saved && ['browse', 'recommendations', 'chat', 'admin', 'auth'].includes(saved)) {
+        return saved as any;
+      }
+    } catch {}
+    return 'browse';
+  });
+
+  const setActiveTab = useCallback((tab: 'browse' | 'recommendations' | 'chat' | 'admin' | 'auth') => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('culina_active_tab', tab);
+      if (window.location.hash.replace('#', '') !== tab) {
+        window.history.replaceState(null, '', `#${tab}`);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['browse', 'recommendations', 'chat', 'admin', 'auth'].includes(hash)) {
+        setActiveTabState(hash as any);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setCurrentUser(null);
+      localStorage.removeItem('culina_current_user_id');
+    };
+    window.addEventListener('culina:auth_expired', handleAuthExpired);
+    return () => window.removeEventListener('culina:auth_expired', handleAuthExpired);
+  }, []);
+
   const [tasteProfileApiData, setTasteProfileApiData] = useState<TasteProfileApiData | null>(null);
 
   const refreshGuestQuota = useCallback(async () => {
@@ -556,7 +600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
   };
 
-  const toggleFavorite = (dishId: string) => {
+  const toggleFavorite = async (dishId: string) => {
     if (!currentUser) {
       setAuthModalType('login');
       return;
@@ -567,12 +611,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ? curFavs.filter((id) => id !== dishId)
       : [...curFavs, dishId];
 
+    // Cập nhật lạc quan vào state người dùng
     const updatedUser = {
       ...currentUser,
       favorites: newFavorites,
     };
     setCurrentUser(updatedUser);
     setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+
+    // Cập nhật trạng thái món ăn trong danh sách dishes và activeDishModal
+    setDishes((prev) =>
+      prev.map((d) => {
+        if (d.id === dishId) {
+          const count = d.favoriteCount ?? 0;
+          return {
+            ...d,
+            isFavorite: !isFav,
+            favoriteCount: Math.max(0, isFav ? count - 1 : count + 1),
+          };
+        }
+        return d;
+      })
+    );
+
+    setActiveDishModal((prev) => {
+      if (prev && prev.id === dishId) {
+        const count = prev.favoriteCount ?? 0;
+        return {
+          ...prev,
+          isFavorite: !isFav,
+          favoriteCount: Math.max(0, isFav ? count - 1 : count + 1),
+        };
+      }
+      return prev;
+    });
+
+    // Đồng bộ lên máy chủ qua API mục 4.8.1 / 4.8.2
+    try {
+      if (isFav) {
+        const res = await engagementApi.removeFavorite(dishId);
+        if (res.success && res.data) {
+          setDishes((prev) =>
+            prev.map((d) =>
+              d.id === dishId
+                ? { ...d, isFavorite: false, favoriteCount: res.data.favorite_count }
+                : d
+            )
+          );
+        }
+      } else {
+        const res = await engagementApi.addFavorite(dishId);
+        if (res.success && res.data) {
+          setDishes((prev) =>
+            prev.map((d) =>
+              d.id === dishId
+                ? { ...d, isFavorite: true, favoriteCount: res.data.favorite_count }
+                : d
+            )
+          );
+        }
+      }
+    } catch (err) {
+      console.warn('Lỗi khi gọi API favorite:', err);
+    }
   };
 
   const recordCookedMeal = (dish: Dish, mealType: string) => {

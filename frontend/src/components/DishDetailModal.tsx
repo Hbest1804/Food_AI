@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   X,
@@ -17,8 +17,12 @@ import {
   Tag,
   DollarSign,
   ChevronRight,
+  Edit3,
+  Trash2,
+  Filter,
 } from 'lucide-react';
 import { dishesApi, DishDetailItem } from '../api/dishesApi';
+import { engagementApi, RatingReviewItem, RatingSummary } from '../api/engagementApi';
 import { dishDetailItemToDish } from '../utils/dishAdapter';
 
 export const DishDetailModal: React.FC = () => {
@@ -39,9 +43,56 @@ export const DishDetailModal: React.FC = () => {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [servings, setServings] = useState<number>(activeDishModal?.servings || 2);
   const [checkedIngredients, setCheckedIngredients] = useState<Record<string, boolean>>({});
+
+  // States quản lý đánh giá & bình luận theo mục 4.8
+  const [ratingsList, setRatingsList] = useState<RatingReviewItem[]>([]);
+  const [ratingsSummary, setRatingsSummary] = useState<RatingSummary | null>(null);
+  const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  const [reviewSort, setReviewSort] = useState<'newest' | 'highest' | 'lowest'>('newest');
+  const [filterHasComment, setFilterHasComment] = useState(false);
+
   const [newRating, setNewRating] = useState<number>(5);
   const [newComment, setNewComment] = useState<string>('');
   const [hasSubmittedReview, setHasSubmittedReview] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Chỉnh sửa đánh giá của chính mình (PATCH 4.8.5)
+  const [myRating, setMyRating] = useState<RatingReviewItem | null>(null);
+  const [isEditingMyRating, setIsEditingMyRating] = useState(false);
+  const [editStars, setEditStars] = useState<number>(5);
+  const [editComment, setEditComment] = useState<string>('');
+
+  // Tải danh sách đánh giá từ API GET /dishes/:dishId/ratings (mục 4.8.3)
+  const fetchRatings = useCallback(
+    async (dishId: string) => {
+      setIsLoadingRatings(true);
+      try {
+        const res = await engagementApi.getDishRatings(dishId, {
+          sort: reviewSort,
+          has_comment: filterHasComment,
+          limit: 50,
+        });
+        if (res.success && res.data) {
+          setRatingsList(res.data.items);
+          setRatingsSummary(res.data.summary);
+          if (currentUser) {
+            const mine = res.data.items.find((item) => item.user?.id === currentUser.id);
+            setMyRating(mine || null);
+            if (mine) {
+              setEditStars(mine.stars);
+              setEditComment(mine.comment || '');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi tải đánh giá từ API:', err);
+      } finally {
+        setIsLoadingRatings(false);
+      }
+    },
+    [currentUser, reviewSort, filterHasComment]
+  );
 
   // Fetch full details từ backend GET /dishes/:idOrSlug
   useEffect(() => {
@@ -65,16 +116,22 @@ export const DishDetailModal: React.FC = () => {
         .finally(() => {
           setIsLoadingDetail(false);
         });
+
+      // Tải danh sách đánh giá từ API
+      fetchRatings(activeDishModal.id);
     } else {
       setDetailData(null);
+      setRatingsList([]);
+      setRatingsSummary(null);
+      setMyRating(null);
+      setIsEditingMyRating(false);
     }
-  }, [activeDishModal]);
+  }, [activeDishModal, fetchRatings]);
 
   if (!activeDishModal) return null;
 
   const dish = activeDishModal;
-  const isFavorite = currentUser?.favorites?.includes(dish.id) || detailData?.is_favorite || false;
-  const dishReviews = reviews.filter((r) => r.dishId === dish.id);
+  const isFavorite = currentUser?.favorites?.includes(dish.id) || dish.isFavorite || detailData?.is_favorite || false;
   const matchInfo = calculateDishMatchScore(dish);
 
   // Scaled ingredient amounts
@@ -88,18 +145,75 @@ export const DishDetailModal: React.FC = () => {
     }));
   };
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  // Gửi đánh giá mới - POST /dishes/:dishId/ratings (4.8.4)
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
       setActiveDishModal(null);
       setAuthModalType('login');
       return;
     }
-    if (!newComment.trim()) return;
-    addReview(dish.id, newRating, newComment.trim());
-    setNewComment('');
-    setHasSubmittedReview(true);
-    setTimeout(() => setHasSubmittedReview(false), 3000);
+    setIsSubmittingReview(true);
+    setReviewError(null);
+    try {
+      const res = await engagementApi.createDishRating(dish.id, {
+        stars: newRating,
+        comment: newComment.trim() || undefined,
+      });
+      if (res.success) {
+        setNewComment('');
+        setHasSubmittedReview(true);
+        setTimeout(() => setHasSubmittedReview(false), 3000);
+        await fetchRatings(dish.id);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error?.message || err.message || 'Không thể gửi đánh giá.';
+      setReviewError(msg);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  // Cập nhật đánh giá của mình - PATCH /ratings/:ratingId (4.8.5)
+  const handleUpdateMyRating = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myRating) return;
+    setIsSubmittingReview(true);
+    setReviewError(null);
+    try {
+      const res = await engagementApi.updateRating(myRating.id, {
+        stars: editStars,
+        comment: editComment.trim() || undefined,
+      });
+      if (res.success) {
+        setIsEditingMyRating(false);
+        await fetchRatings(dish.id);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error?.message || err.message || 'Không thể sửa đánh giá.';
+      setReviewError(msg);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  // Xóa đánh giá của mình - DELETE /ratings/:ratingId (4.8.6)
+  const handleDeleteMyRating = async () => {
+    if (!myRating) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá của mình khỏi món ăn này?')) return;
+    setIsSubmittingReview(true);
+    setReviewError(null);
+    try {
+      await engagementApi.deleteRating(myRating.id);
+      setMyRating(null);
+      setIsEditingMyRating(false);
+      await fetchRatings(dish.id);
+    } catch (err: any) {
+      const msg = err.response?.data?.error?.message || err.message || 'Không thể xóa đánh giá.';
+      setReviewError(msg);
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   // Lấy danh sách nguyên liệu ưu tiên từ detailData của API (nếu có)
@@ -468,23 +582,24 @@ export const DishDetailModal: React.FC = () => {
             </div>
           )}
 
-          {/* Rating Summary Breakdown (từ backend rating_summary) */}
-          {ratingSummary && ratingSummary.count > 0 && (
-            <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/70">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 mb-3">
-                Tổng hợp điểm đánh giá cộng đồng ({ratingSummary.count} lượt đánh giá)
+          {/* Rating Summary Breakdown (từ backend rating_summary mục 4.8.3) */}
+          {((ratingsSummary && ratingsSummary.count > 0) || (detailData?.rating_summary && detailData.rating_summary.count > 0)) && (
+            <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 shadow-2xs">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 mb-3 flex items-center justify-between">
+                <span>Tổng hợp điểm đánh giá ({ratingsSummary?.count || detailData?.rating_summary?.count} lượt)</span>
+                <span className="text-[11px] font-semibold text-amber-800">Thang điểm 5.0 ⭐</span>
               </h4>
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="text-center sm:text-left shrink-0">
                   <div className="text-4xl font-serif font-black text-amber-900">
-                    {ratingSummary.average}
+                    {ratingsSummary?.average || detailData?.rating_summary?.average || dish.rating}
                   </div>
                   <div className="flex items-center gap-0.5 mt-1">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
                         className={`w-4 h-4 ${
-                          s <= Math.round(ratingSummary.average)
+                          s <= Math.round(ratingsSummary?.average || detailData?.rating_summary?.average || dish.rating)
                             ? 'fill-amber-400 text-amber-500'
                             : 'text-stone-300'
                         }`}
@@ -498,11 +613,10 @@ export const DishDetailModal: React.FC = () => {
 
                 <div className="flex-1 w-full space-y-1.5">
                   {[5, 4, 3, 2, 1].map((stars) => {
-                    const starCount = ratingSummary.distribution?.[String(stars)] || 0;
-                    const percent =
-                      ratingSummary.count > 0
-                        ? Math.round((starCount / ratingSummary.count) * 100)
-                        : 0;
+                    const dist = ratingsSummary?.distribution || detailData?.rating_summary?.distribution || {};
+                    const starCount = dist[String(stars)] || 0;
+                    const totalCount = ratingsSummary?.count || detailData?.rating_summary?.count || 1;
+                    const percent = Math.round((starCount / totalCount) * 100);
                     return (
                       <div key={stars} className="flex items-center gap-2 text-xs text-stone-600">
                         <span className="w-8 shrink-0 font-medium">{stars} sao</span>
@@ -520,48 +634,164 @@ export const DishDetailModal: React.FC = () => {
                   })}
                 </div>
               </div>
-
-              {detailData?.my_rating && (
-                <div className="mt-3 pt-3 border-t border-amber-200/80 text-xs text-amber-900 flex items-center gap-2">
-                  <span className="font-semibold">Đánh giá của bạn:</span>
-                  <div className="flex items-center gap-0.5">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        className={`w-3.5 h-3.5 ${
-                          s <= detailData.my_rating!.stars
-                            ? 'fill-amber-400 text-amber-500'
-                            : 'text-stone-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  {detailData.my_rating.comment && (
-                    <span className="italic text-stone-700 font-normal">
-                      "{detailData.my_rating.comment}"
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
-          {/* Reviews & Community Comments */}
-          <div className="pt-4 border-t border-stone-200">
-            <h3 className="font-serif font-bold text-lg text-stone-900 mb-3">
-              Đánh giá & Bình luận từ người nấu ({dishReviews.length})
-            </h3>
+          {/* Reviews & Community Comments (Mục 4.8.3, 4.8.4, 4.8.5, 4.8.6) */}
+          <div className="pt-4 border-t border-stone-200 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="font-serif font-bold text-lg text-stone-900">
+                Đánh giá & Bình luận ({ratingsList.length})
+              </h3>
 
-            {/* Review form (Only for authenticated users) */}
-            {currentUser ? (
+              {/* Bộ lọc & sắp xếp đánh giá */}
+              <div className="flex items-center gap-2 text-xs">
+                <select
+                  value={reviewSort}
+                  onChange={(e) => setReviewSort(e.target.value as any)}
+                  className="px-2.5 py-1.5 rounded-xl border border-stone-300 bg-white text-stone-700 font-medium focus:outline-hidden focus:ring-1 focus:ring-teal-500 cursor-pointer"
+                >
+                  <option value="newest">Mới nhất</option>
+                  <option value="highest">Điểm cao nhất</option>
+                  <option value="lowest">Điểm thấp nhất</option>
+                </select>
+
+                <label className="inline-flex items-center gap-1.5 text-stone-600 cursor-pointer text-xs select-none">
+                  <input
+                    type="checkbox"
+                    checked={filterHasComment}
+                    onChange={(e) => setFilterHasComment(e.target.checked)}
+                    className="rounded text-teal-600 focus:ring-teal-500"
+                  />
+                  <span>Chỉ có nhận xét</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Thông báo lỗi đánh giá (nếu có) */}
+            {reviewError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center gap-2 animate-in fade-in">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{reviewError}</span>
+              </div>
+            )}
+
+            {/* KHU VỰC ĐÁNH GIÁ CỦA CHÍNH MÌNH (Nếu đã từng đánh giá -> Có nút Sửa & Xóa) */}
+            {currentUser && myRating && (
+              <div className="p-4 rounded-2xl bg-teal-50/80 border border-teal-200 shadow-2xs">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-teal-900">Đánh giá của bạn:</span>
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          className={`w-3.5 h-3.5 ${
+                            s <= (isEditingMyRating ? editStars : myRating.stars)
+                              ? 'fill-amber-400 text-amber-500'
+                              : 'text-stone-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {!isEditingMyRating && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingMyRating(true)}
+                        className="px-2.5 py-1 text-xs text-teal-800 hover:bg-teal-100 rounded-lg font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Sửa đánh giá"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Sửa</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteMyRating}
+                        disabled={isSubmittingReview}
+                        className="px-2.5 py-1 text-xs text-rose-600 hover:bg-rose-100 rounded-lg font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Xóa đánh giá"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Xóa</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {isEditingMyRating ? (
+                  <form onSubmit={handleUpdateMyRating} className="space-y-3 mt-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-stone-600">Chọn số sao:</span>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setEditStars(star)}
+                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                        >
+                          <Star
+                            className={`w-5 h-5 ${
+                              star <= editStars ? 'fill-amber-400 text-amber-500' : 'text-stone-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                      <span className="text-xs font-bold text-stone-700 ml-1">{editStars} sao</span>
+                    </div>
+
+                    <div className="relative">
+                      <textarea
+                        value={editComment}
+                        onChange={(e) => setEditComment(e.target.value)}
+                        placeholder="Nội dung đánh giá sửa đổi..."
+                        rows={3}
+                        maxLength={1000}
+                        className="w-full text-xs sm:text-sm p-3 rounded-xl border border-stone-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-700"
+                      />
+                      <div className="text-[10px] text-stone-400 text-right mt-0.5">
+                        {editComment.length}/1000 ký tự
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingMyRating(false)}
+                        className="px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-200 rounded-xl font-medium transition-colors cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingReview}
+                        className="px-4 py-1.5 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        {isSubmittingReview ? 'Đang lưu...' : 'Lưu thay đổi'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  myRating.comment && (
+                    <p className="text-xs text-stone-700 mt-1 leading-relaxed italic">
+                      "{myRating.comment}"
+                    </p>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* FORM TẠO ĐÁNH GIÁ MỚI (Nếu chưa từng đánh giá và đã đăng nhập) */}
+            {currentUser && !myRating && (
               <form
                 onSubmit={handleReviewSubmit}
-                className="mb-6 p-4 rounded-2xl bg-stone-50 border border-stone-200"
+                className="p-4 rounded-2xl bg-stone-50 border border-stone-200"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold text-stone-700">
-                    Bạn đang bình luận với tên:{' '}
-                    <span className="font-bold text-teal-800">{currentUser.name}</span>
+                    Bình luận dưới tên: <span className="font-bold text-teal-800">{currentUser.name}</span>
                   </span>
 
                   {/* Star rating selector */}
@@ -571,20 +801,16 @@ export const DishDetailModal: React.FC = () => {
                         key={star}
                         type="button"
                         onClick={() => setNewRating(star)}
-                        className="p-1 focus:outline-hidden hover:scale-110 transition-transform cursor-pointer"
+                        className="p-1 hover:scale-110 transition-transform cursor-pointer"
                       >
                         <Star
                           className={`w-5 h-5 ${
-                            star <= newRating
-                              ? 'fill-amber-400 text-amber-500'
-                              : 'text-stone-300'
+                            star <= newRating ? 'fill-amber-400 text-amber-500' : 'text-stone-300'
                           }`}
                         />
                       </button>
                     ))}
-                    <span className="text-xs font-bold text-stone-700 ml-1.5">
-                      {newRating} sao
-                    </span>
+                    <span className="text-xs font-bold text-stone-700 ml-1.5">{newRating} sao</span>
                   </div>
                 </div>
 
@@ -592,17 +818,23 @@ export const DishDetailModal: React.FC = () => {
                   <textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Chia sẻ cảm nhận về hương vị, mẹo bạn biến tấu khi nấu món này..."
+                    placeholder="Chia sẻ trải nghiệm về hương vị, độ khó, hoặc mẹo biến tấu của bạn..."
                     rows={3}
+                    maxLength={1000}
                     className="w-full text-xs sm:text-sm p-3 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-700 bg-white"
-                    required
                   />
+                  <div className="flex items-center justify-between mt-1 text-[10px] text-stone-400">
+                    <span>Tối đa 1000 ký tự</span>
+                    <span>{newComment.length}/1000</span>
+                  </div>
+
                   <button
                     type="submit"
-                    className="mt-2 px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
+                    disabled={isSubmittingReview}
+                    className="mt-2 px-4 py-2 bg-teal-800 hover:bg-teal-900 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>Gửi đánh giá</span>
+                    <span>{isSubmittingReview ? 'Đang gửi...' : 'Gửi đánh giá'}</span>
                   </button>
                 </div>
 
@@ -613,8 +845,11 @@ export const DishDetailModal: React.FC = () => {
                   </div>
                 )}
               </form>
-            ) : (
-              <div className="mb-6 p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-stone-800">
+            )}
+
+            {/* Chưa đăng nhập: Mời đăng nhập */}
+            {!currentUser && (
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-stone-800">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
                     <MessageSquare className="w-4 h-4 text-amber-700" />
@@ -624,7 +859,7 @@ export const DishDetailModal: React.FC = () => {
                       Đăng nhập để đánh giá & bình luận
                     </div>
                     <div className="text-[11px] sm:text-xs text-stone-600">
-                      Tính năng đánh giá sao và chia sẻ trải nghiệm dành riêng cho thành viên đã đăng nhập.
+                      Chấm điểm sao và chia sẻ trải nghiệm nấu nướng dành riêng cho thành viên đã đăng nhập.
                     </div>
                   </div>
                 </div>
@@ -641,42 +876,67 @@ export const DishDetailModal: React.FC = () => {
               </div>
             )}
 
-            {/* Existing Reviews List */}
-            <div className="space-y-3">
-              {dishReviews.map((rev) => (
-                <div key={rev.id} className="p-3.5 rounded-2xl bg-white border border-stone-200/80">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={rev.userAvatar}
-                        alt={rev.userName}
-                        className="w-7 h-7 rounded-full object-cover border border-stone-300"
-                      />
-                      <div>
-                        <div className="text-xs font-bold text-stone-900">{rev.userName}</div>
-                        <div className="text-[10px] text-stone-400">{rev.date}</div>
+            {/* DANH SÁCH BÌNH LUẬN & ĐÁNH GIÁ CÔNG KHAI (Mục 4.8.3) */}
+            {isLoadingRatings ? (
+              <div className="py-8 text-center text-xs text-stone-400 flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-teal-700" />
+                <span>Đang tải đánh giá từ cộng đồng...</span>
+              </div>
+            ) : ratingsList.length === 0 ? (
+              <div className="py-8 text-center bg-stone-50 rounded-2xl border border-stone-200">
+                <MessageSquare className="w-6 h-6 text-stone-400 mx-auto mb-1.5" />
+                <p className="text-xs text-stone-500 font-medium">
+                  Chưa có đánh giá nào cho món ăn này. Hãy là người đầu tiên thưởng thức và chấm điểm!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {ratingsList.map((rev) => (
+                  <div key={rev.id} className="p-3.5 rounded-2xl bg-white border border-stone-200/80 shadow-2xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={rev.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(rev.user.name)}&background=0D9488&color=fff`}
+                          alt={rev.user.name}
+                          className="w-7 h-7 rounded-full object-cover border border-stone-300"
+                        />
+                        <div>
+                          <div className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                            <span>{rev.user.name}</span>
+                            {currentUser && rev.user.id === currentUser.id && (
+                              <span className="text-[10px] bg-teal-100 text-teal-800 font-bold px-1.5 py-0.2 rounded-md">
+                                Bạn
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-stone-400">
+                            {new Date(rev.created_at).toLocaleDateString('vi-VN')}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${
+                              i < rev.stars
+                                ? 'fill-amber-400 text-amber-500'
+                                : 'text-stone-300'
+                            }`}
+                          />
+                        ))}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-0.5">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-3.5 h-3.5 ${
-                            i < rev.rating
-                              ? 'fill-amber-400 text-amber-500'
-                              : 'text-stone-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
+                    {rev.comment && (
+                      <p className="text-xs text-stone-700 leading-relaxed pl-9">
+                        {rev.comment}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-stone-700 leading-relaxed pl-9">
-                    {rev.comment}
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

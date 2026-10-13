@@ -2,6 +2,7 @@
 // Xử lý Hồ sơ khẩu vị người dùng theo mục 4.5 và 5.3.1 của tài liệu đặc tả API
 
 import { supabaseAdmin } from '../config/supabase.js';
+import { invalidateRecommendationCache } from '../services/recommendationService.js';
 
 /**
  * Tính phần trăm hoàn thiện hồ sơ khẩu vị (0 - 100)
@@ -427,6 +428,9 @@ export async function updateTasteProfile(req, res, next) {
 
     // ── 5. Trả về hồ sơ khẩu vị đầy đủ mới nhất ──────────────────────────────
     const fullProfile = await fetchFullTasteProfile(userId);
+
+    // Hủy cache gợi ý cá nhân hóa vì hồ sơ khẩu vị đã thay đổi (Quy tắc 3 mục 4.7.1)
+    invalidateRecommendationCache(userId);
 
     return res.status(200).json({
       success: true,
