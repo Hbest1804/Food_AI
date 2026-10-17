@@ -43,6 +43,11 @@ const MainLayout: React.FC = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [activeTab]);
 
+  // Nếu là tài khoản Admin và đang truy cập Quản trị: Render Giao diện Quản trị riêng biệt độc lập 100% (bỏ Navbar người dùng)
+  if (activeTab === 'admin' && currentUser?.role === 'admin') {
+    return <AdminPortal />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-stone-50/60 text-stone-900 selection:bg-amber-200">
       {/* Top Navbar */}
@@ -58,7 +63,9 @@ const MainLayout: React.FC = () => {
           </div>
         )}
         {activeTab === 'auth' && <AuthPage />}
-        {activeTab === 'admin' && currentUser?.role === 'admin' && <AdminPortal />}
+        {activeTab === 'admin' && currentUser?.role === 'admin' && (
+          <AdminPortal />
+        )}
         {activeTab === 'admin' && currentUser?.role !== 'admin' && (
           <div className="max-w-md mx-auto my-20 p-8 bg-white border border-stone-200 rounded-3xl text-center shadow-lg">
             <ShieldCheck className="w-12 h-12 text-purple-600 mx-auto mb-3" />
@@ -81,8 +88,8 @@ const MainLayout: React.FC = () => {
         )}
       </main>
 
-      {/* Floating Bottom-Right Chatbot Widget (Only when not in fullpage chat or auth) */}
-      {activeTab !== 'chat' && activeTab !== 'auth' && (
+      {/* Floating Bottom-Right Chatbot Widget (Only when not in fullpage chat, auth, or admin) */}
+      {activeTab !== 'chat' && activeTab !== 'auth' && activeTab !== 'admin' && (
         <div className="fixed bottom-5 right-5 z-40">
           {isChatOpen ? (
             <div className="animate-in slide-in-from-bottom-5">
@@ -112,8 +119,8 @@ const MainLayout: React.FC = () => {
         </div>
       )}
 
-      {/* Footer (Hidden on Auth Page) */}
-      {activeTab !== 'auth' && (
+      {/* Footer (Hidden on Auth Page and Admin) */}
+      {activeTab !== 'auth' && activeTab !== 'admin' && (
         <footer className="bg-white border-t border-stone-200 mt-16 py-10 text-stone-600 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-4 gap-8">
           <div className="sm:col-span-2">
@@ -156,7 +163,7 @@ const MainLayout: React.FC = () => {
                   onClick={() => setIsFridgeModalOpen(true)}
                   className="hover:text-amber-800 transition-colors"
                 >
-                  Tìm món từ tủ lạnh (Chống lãng phí)
+                  Tìm món theo nguyên liệu có sẵn
                 </button>
               </li>
               <li>
@@ -215,7 +222,7 @@ const MainLayout: React.FC = () => {
       <ErrorBoundary fallbackTitle="Không thể tải thông tin hồ sơ của bạn">
         <PersonalDataModal />
       </ErrorBoundary>
-      <ErrorBoundary fallbackTitle="Không thể tải tính năng tìm món từ tủ lạnh">
+      <ErrorBoundary fallbackTitle="Không thể tải tính năng nguyên liệu có sẵn">
         <FridgeSearchModal />
       </ErrorBoundary>
     </div>

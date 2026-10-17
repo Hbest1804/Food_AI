@@ -92,7 +92,7 @@ export const Navbar: React.FC = () => {
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <Refrigerator className="w-4 h-4 text-teal-700" />
-                <span>Tủ lạnh thông minh</span>
+                <span>Nguyên liệu có sẵn</span>
               </button>
 
 
@@ -321,7 +321,7 @@ export const Navbar: React.FC = () => {
             className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
           >
             <Refrigerator className="w-4 h-4 text-teal-700" />
-            <span>Tủ lạnh thông minh</span>
+            <span>Nguyên liệu có sẵn</span>
           </button>
 
           <button

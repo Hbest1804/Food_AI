@@ -38,4 +38,11 @@ export const env = {
   },
 
   guestChatLimit: parseInt(process.env.GUEST_CHAT_LIMIT ?? '5', 10),
+
+  adminSeed: {
+    email: (process.env.ADMIN_EMAIL || process.env.ADMIN_USER || process.env.Admin_User || '').trim(),
+    password: (process.env.ADMIN_PASSWORD || process.env.Password || '').trim(),
+    role: (process.env.ADMIN_ROLE || process.env.role || 'admin').trim().toLowerCase(),
+    displayName: (process.env.ADMIN_NAME || 'Quản trị viên').trim(),
+  },
 };

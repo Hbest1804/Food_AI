@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
+  apiRequestPasswordReset,
+  apiResetPassword,
+} from '../api/authApi';
+import {
   Mail,
   Lock,
   User as UserIcon,
@@ -53,25 +57,22 @@ export const AuthPage: React.FC = () => {
   const [regDiet, setRegDiet] = useState('Eat Clean');
   const [regAllergies, setRegAllergies] = useState<string[]>([]);
 
-  // Forgot password flow state
+  // Forgot password flow state (UC15 - dùng API thật)
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3>(1);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [mockOtp, setMockOtp] = useState('');
-  const [enteredOtp, setEnteredOtp] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
 
   // Handle Login
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    const success = await login(loginEmail, loginPassword);
-    if (success) {
-      setActiveTab('browse');
-    }
-    // authError được set bởi context nếu thất bại
+    await login(loginEmail, loginPassword);
+    // login() trong context tự động điều hướng: Admin -> 'admin', User -> 'browse'
   };
 
   // Handle Register
@@ -98,51 +99,72 @@ export const AuthPage: React.FC = () => {
     // authError được set bởi context nếu thất bại
   };
 
-  // Handle Forgot Step 1
-  const handleForgotStep1 = (e: React.FormEvent) => {
+  // Handle Forgot Step 1: gửi email yêu cầu đặt lại mật khẩu (UC15)
+  const handleForgotStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError('');
     if (!forgotEmail.includes('@')) {
       setForgotError('Vui lòng nhập địa chỉ email hợp lệ.');
       return;
     }
-    const generated = Math.floor(100000 + Math.random() * 900000).toString();
-    setMockOtp(generated);
-    setForgotStep(2);
+    setForgotLoading(true);
+    try {
+      await apiRequestPasswordReset(forgotEmail);
+      // Luôn chuyển sang bước 2 dù email có tồn tại hay không (tránh dò tìm)
+      setForgotStep(2);
+    } catch (err) {
+      // Vẫn chuyển sang bước 2 để không lộ thông tin
+      setForgotStep(2);
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
-  // Handle Forgot Step 2
+  // Handle Forgot Step 2: người dùng đã nhận email và nhập token từ link
   const handleForgotStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError('');
-    if (enteredOtp.trim() !== mockOtp) {
-      setForgotError('Mã OTP không chính xác. Hãy nhập mã hiển thị bên dưới.');
+    if (!resetToken.trim()) {
+      setForgotError('Vui lòng nhập token từ email đặt lại mật khẩu.');
       return;
     }
     setForgotStep(3);
   };
 
-  // Handle Forgot Step 3
-  const handleForgotStep3 = (e: React.FormEvent) => {
+  // Handle Forgot Step 3: đặt mật khẩu mới
+  const handleForgotStep3 = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError('');
-    if (newPassword.length < 6) {
-      setForgotError('Mật khẩu mới cần tối thiểu 6 ký tự.');
+    if (newPassword.length < 8) {
+      setForgotError('Mật khẩu mới cần tối thiểu 8 ký tự.');
       return;
     }
     if (newPassword !== newPasswordConfirm) {
       setForgotError('Xác nhận mật khẩu mới không khớp.');
       return;
     }
-
-    resetPassword(forgotEmail, newPassword);
-    setResetSuccess(true);
-    setTimeout(() => {
-      setResetSuccess(false);
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setForgotError('Mật khẩu cần có chữ hoa, chữ thường và số.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      await apiResetPassword(resetToken.trim(), newPassword, newPasswordConfirm);
+      setResetSuccess(true);
+      setTimeout(() => {
+        setResetSuccess(false);
+        setForgotStep(1);
+        setResetToken('');
+        setAuthModalType('login');
+        setLoginEmail(forgotEmail);
+      }, 2000);
+    } catch (err: any) {
+      const msg = err?.error?.message || 'Token không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu lại.';
+      setForgotError(msg);
       setForgotStep(1);
-      setAuthModalType('login');
-      setLoginEmail(forgotEmail);
-    }, 1500);
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const toggleAllergy = (allergy: string) => {
@@ -207,7 +229,7 @@ export const AuthPage: React.FC = () => {
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
-              Đăng nhập để CulinaAI tự động nhớ hồ sơ dị ứng của gia đình bạn, tính toán calo chuẩn xác theo từng bữa và khai thác tủ lạnh thông minh.
+              Đăng nhập để CulinaAI tự động nhớ hồ sơ dị ứng của gia đình bạn, tính toán calo chuẩn xác theo từng bữa và khai thác nguyên liệu có sẵn.
             </p>
           </div>
 
@@ -605,9 +627,9 @@ export const AuthPage: React.FC = () => {
                     Khôi phục mật khẩu
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                    {forgotStep === 1 && 'Nhập email tài khoản của bạn để nhận mã xác minh OTP.'}
-                    {forgotStep === 2 && 'Nhập mã OTP 6 số đã được gửi tới email của bạn.'}
-                    {forgotStep === 3 && 'Tạo mật khẩu mới cho tài khoản.'}
+                    {forgotStep === 1 && 'Nhập email tài khoản để nhận hướng dẫn đặt lại mật khẩu qua email.'}
+                    {forgotStep === 2 && 'Kiểm tra email và sao chép token từ liên kết đặt lại mật khẩu.'}
+                    {forgotStep === 3 && 'Tạo mật khẩu mới cho tài khoản (tối thiểu 8 ký tự, có chữ hoa, thường và số).'}
                   </p>
                 </div>
 
@@ -647,10 +669,14 @@ export const AuthPage: React.FC = () => {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      disabled={forgotLoading}
+                      className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <span>Gửi mã xác thực OTP</span>
-                      <ArrowRight className="w-4 h-4" />
+                      {forgotLoading ? (
+                        <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg><span>Đang gửi...</span></>
+                      ) : (
+                        <><span>Gửi yêu cầu đặt lại mật khẩu</span><ArrowRight className="w-4 h-4" /></>
+                      )}
                     </button>
                   </form>
                 )}
@@ -659,21 +685,21 @@ export const AuthPage: React.FC = () => {
                 {forgotStep === 2 && (
                   <form onSubmit={handleForgotStep2} className="space-y-4">
                     <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-200 text-xs text-teal-900">
-                      Mã OTP giả lập cho phiên này là: <strong className="text-base text-teal-800 tracking-wider ml-1">{mockOtp}</strong>
+                      <p className="font-bold mb-1">📧 Email đã được gửi tới: <span className="text-teal-700">{forgotEmail}</span></p>
+                      <p>Mở email và nhấn vào liên kết đặt lại mật khẩu. Sao chép token (chuỗi ký tự sau <code className="bg-teal-100 px-1 rounded">token=</code> trong URL) và dán vào bên dưới.</p>
                     </div>
 
                     <div>
                       <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                        Nhập mã OTP 6 số
+                        Token đặt lại mật khẩu (từ email)
                       </label>
                       <input
                         type="text"
-                        value={enteredOtp}
-                        onChange={(e) => setEnteredOtp(e.target.value)}
-                        placeholder="123456"
-                        maxLength={6}
+                        value={resetToken}
+                        onChange={(e) => setResetToken(e.target.value)}
+                        placeholder="Dán token từ email vào đây..."
                         required
-                        className="w-full text-center text-lg font-bold tracking-widest py-3 rounded-2xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
+                        className="w-full text-xs sm:text-sm py-3 px-4 rounded-2xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
                       />
                     </div>
 
@@ -689,7 +715,7 @@ export const AuthPage: React.FC = () => {
                         type="submit"
                         className="w-1/2 py-3 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all cursor-pointer"
                       >
-                        Xác nhận mã
+                        Tiếp tục
                       </button>
                     </div>
                   </form>
@@ -748,10 +774,14 @@ export const AuthPage: React.FC = () => {
 
                     <button
                       type="submit"
-                      className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      disabled={forgotLoading}
+                      className="w-full py-3.5 bg-teal-800 hover:bg-teal-900 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <span>Lưu mật khẩu mới</span>
-                      <ArrowRight className="w-4 h-4" />
+                      {forgotLoading ? (
+                        <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg><span>Đang lưu...</span></>
+                      ) : (
+                        <><span>Lưu mật khẩu mới</span><ArrowRight className="w-4 h-4" /></>
+                      )}
                     </button>
                   </form>
                 )}

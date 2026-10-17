@@ -134,7 +134,7 @@ export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreC
               className="px-5 py-3.5 rounded-2xl bg-teal-900/60 hover:bg-teal-900/80 text-emerald-200 font-semibold text-xs sm:text-sm border border-teal-500/30 backdrop-blur-md transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Refrigerator className="w-4 h-4 text-emerald-400" />
-              <span>Tủ lạnh thông minh</span>
+              <span>Nguyên liệu có sẵn</span>
             </button>
           </div>
 
@@ -176,7 +176,7 @@ export const BrowseHeroSection: React.FC<BrowseHeroSectionProps> = ({ onExploreC
               </div>
               <div>
                 <div className="text-xs font-bold text-white">Chống Lãng Phí</div>
-                <div className="text-[11px] text-slate-300">Tận dụng đồ tủ lạnh</div>
+                <div className="text-[11px] text-slate-300">Tận dụng nguyên liệu có sẵn</div>
               </div>
             </div>
           </div>

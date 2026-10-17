@@ -461,7 +461,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       setCurrentUser(loggedInUser);
-      setAuthModalType(null);
+      setAuthModalTypeState(null);
+      if (loggedInUser.role === 'admin') {
+        setActiveTab('admin');
+      } else {
+        setActiveTab('browse');
+      }
       return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Đăng nhập thất bại.';

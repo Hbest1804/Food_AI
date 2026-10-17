@@ -55,6 +55,7 @@ export async function authenticate(req, res, next) {
       id: profile.id,
       email: profile.email,
       displayName: profile.display_name,
+      avatarUrl: authUser.user_metadata?.avatar_url || null,
       role: profile.role,
     };
 

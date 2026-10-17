@@ -9,6 +9,20 @@ import {
   patchTasteProfile,
 } from '../controllers/tasteProfileController.js';
 import { getRecommendations } from '../controllers/recommendationController.js';
+import { handleAvatarUpload } from '../middlewares/uploadMiddleware.js';
+import { uploadUserAvatar } from '../controllers/uploadController.js';
+import {
+  getMyProfile,
+  updateMyProfile,
+  changeMyPassword,
+  deleteMyAccount,
+  getMyFavorites,
+  clearMyFavorites,
+  getMyRatings,
+  getMyViewHistory,
+  clearMyViewHistory,
+  deleteMyChatHistory,
+} from '../controllers/adminController.js';
 
 const router = Router();
 
@@ -26,6 +40,24 @@ router.patch('/taste-profile', patchTasteProfile);
 
 // 4.7.1 Nhận gợi ý món ăn - GET /me/recommendations
 router.get('/recommendations', getRecommendations);
+
+// 5.6.1 Tải ảnh đại diện - POST /me/avatar
+router.post('/avatar', handleAvatarUpload, uploadUserAvatar);
+
+// Section 4.9 & 5.5: Dữ liệu cá nhân
+router.get('/profile', getMyProfile);
+router.get('/', getMyProfile);
+router.put('/profile', updateMyProfile);
+router.patch('/', updateMyProfile);
+router.patch('/password', changeMyPassword);
+router.put('/password', changeMyPassword);
+router.delete('/', deleteMyAccount);
+router.get('/favorites', getMyFavorites);
+router.delete('/favorites', clearMyFavorites);
+router.get('/ratings', getMyRatings);
+router.get('/view-history', getMyViewHistory);
+router.delete('/view-history', clearMyViewHistory);
+router.delete('/chat-history', deleteMyChatHistory);
 
 export default router;
 
