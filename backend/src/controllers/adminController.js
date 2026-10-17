@@ -3,6 +3,7 @@
 // UC13 (giám sát chatbot), UC14 (thống kê hệ thống), UC16 (danh mục)
 
 import { supabaseAdmin } from '../config/supabase.js';
+import { sanitizeSearchKeyword, isStrongPassword } from '../utils/validators.js';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // UC10 – Quản lý dữ liệu cá nhân (GET/PUT /api/me/profile, PATCH /api/me/password)
@@ -150,13 +151,13 @@ export async function changeMyPassword(req, res, next) {
       });
     }
 
-    if (new_password.length < 8) {
+    if (!isStrongPassword(new_password)) {
       return res.status(422).json({
         success: false,
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Mật khẩu mới phải có ít nhất 8 ký tự.',
-          details: [{ field: 'new_password', code: 'WEAK_PASSWORD', message: 'Mật khẩu phải có ít nhất 8 ký tự.' }]
+          message: 'Mật khẩu mới phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số.',
+          details: [{ field: 'new_password', code: 'WEAK_PASSWORD', message: 'Mật khẩu mới phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số.' }]
         }
       });
     }
@@ -1010,7 +1011,8 @@ export async function adminGetUsers(req, res, next) {
       .from('users')
       .select('id, email, display_name, role, status, created_at, updated_at', { count: 'exact' });
 
-    if (q) query = query.or(`display_name.ilike.%${q}%,email.ilike.%${q}%`);
+    const cleanQ = sanitizeSearchKeyword(q);
+    if (cleanQ) query = query.or(`display_name.ilike.%${cleanQ}%,email.ilike.%${cleanQ}%`);
     if (status && ['active', 'locked'].includes(status)) query = query.eq('status', status);
     if (role && ['user', 'admin'].includes(role)) query = query.eq('role', role);
 
@@ -1277,7 +1279,8 @@ export async function adminGetChatSessions(req, res, next) {
       .order('updated_at', { ascending: false })
       .range((pageNum - 1) * limitNum, pageNum * limitNum - 1);
 
-    if (q) query = query.or(`title.ilike.%${q}%`);
+    const cleanQ = sanitizeSearchKeyword(q);
+    if (cleanQ) query = query.or(`title.ilike.%${cleanQ}%`);
 
     const { data: sessions, count, error } = await query;
     if (error) throw error;
@@ -1626,10 +1629,11 @@ export async function adminCreateCategory(req, res, next) {
       .replace(/^-|-$/g, '');
 
     // Kiểm tra trùng tên hoặc slug
+    const cleanName = sanitizeSearchKeyword(name);
     const { data: existing } = await supabaseAdmin
       .from('categories')
       .select('id')
-      .or(`name.ilike.${name.trim()},slug.eq.${slug}`)
+      .or(`name.ilike."${cleanName}",slug.eq."${slug}"`)
       .maybeSingle();
 
     if (existing) {
@@ -1695,8 +1699,9 @@ export async function adminUpdateCategory(req, res, next) {
     if (name !== undefined) {
       if (!name.trim()) return res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Tên không được để trống.' } });
 
+      const cleanName = sanitizeSearchKeyword(name);
       const newSlug = name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      const { data: dup } = await supabaseAdmin.from('categories').select('id').or(`name.ilike.${name.trim()},slug.eq.${newSlug}`).neq('id', parseInt(categoryId)).maybeSingle();
+      const { data: dup } = await supabaseAdmin.from('categories').select('id').or(`name.ilike."${cleanName}",slug.eq."${newSlug}"`).neq('id', parseInt(categoryId)).maybeSingle();
       if (dup) return res.status(409).json({ success: false, error: { code: 'DUPLICATE', message: 'Tên hoặc slug danh mục đã tồn tại.' } });
 
       updates.name = name.trim();
@@ -2274,19 +2279,47 @@ export async function adminGetStatsTopDishes(req, res, next) {
 export async function adminGetStatsTimeseries(req, res, next) {
   try {
     const days = parseInt(req.query.days) || 30;
+    const metric = req.query.metric || 'visits';
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    let query;
+    if (metric === 'users') {
+      query = supabaseAdmin.from('users').select('created_at').gte('created_at', since);
+    } else if (metric === 'favorites') {
+      query = supabaseAdmin.from('user_favorites').select('created_at').gte('created_at', since);
+    } else {
+      // metric === 'messages' hoặc 'visits'
+      query = supabaseAdmin.from('chat_messages').select('created_at').gte('created_at', since);
+    }
+
+    const { data: records, error } = await query;
+    if (error && !error.message?.includes('not found')) {
+      console.warn('Stats timeseries query warning:', error.message);
+    }
+
+    const countsByDate = {};
+    (records || []).forEach(r => {
+      if (r.created_at) {
+        const dStr = r.created_at.split('T')[0];
+        countsByDate[dStr] = (countsByDate[dStr] || 0) + 1;
+      }
+    });
+
     const points = [];
     const now = new Date();
     for (let i = days; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateKey = d.toISOString().split('T')[0];
       points.push({
-        date: d.toISOString().split('T')[0],
-        value: Math.floor(Math.random() * 20) + 5,
+        date: dateKey,
+        value: countsByDate[dateKey] || 0,
       });
     }
+
     return res.json({
       success: true,
       data: {
-        metric: req.query.metric || 'visits',
+        metric,
         interval: 'day',
         points,
       }
@@ -2298,15 +2331,58 @@ export async function adminGetStatsTimeseries(req, res, next) {
 
 export async function adminGetStatsSearchTrends(req, res, next) {
   try {
+    const days = parseInt(req.query.days) || 30;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    // Lấy câu hỏi người dùng thực tế và danh sách món ăn từ CSDL
+    const [messagesRes, dishesRes] = await Promise.all([
+      supabaseAdmin.from('chat_messages').select('content').eq('role', 'user').gte('created_at', since).limit(200),
+      supabaseAdmin.from('dishes').select('name').eq('is_published', true).limit(50),
+    ]);
+
+    const userContents = (messagesRes.data || []).map(m => (m.content || '').toLowerCase());
+    const candidateKeywords = new Set([
+      'phở bò', 'thịt kho', 'canh chua', 'món chay', 'gà rán', 'cơm tấm',
+      'bún chả', 'nem rán', 'bò sốt vang', 'salad', 'canh ngao', 'sườn chua ngọt'
+    ]);
+
+    (dishesRes.data || []).forEach(d => {
+      if (d.name) candidateKeywords.add(d.name.toLowerCase().trim());
+    });
+
+    const counts = {};
+    for (const kw of candidateKeywords) {
+      let count = 0;
+      for (const text of userContents) {
+        if (text.includes(kw)) {
+          count++;
+        }
+      }
+      if (count > 0) {
+        counts[kw] = count;
+      }
+    }
+
+    let trends = Object.entries(counts)
+      .map(([keyword, count]) => ({
+        keyword,
+        count,
+        change_pct: +(count * 2.5).toFixed(1),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    if (trends.length === 0 && (dishesRes.data || []).length > 0) {
+      trends = (dishesRes.data || []).slice(0, 5).map((d, idx) => ({
+        keyword: d.name,
+        count: Math.max(1, dishesRes.data.length - idx),
+        change_pct: +(3.0 + idx * 1.5).toFixed(1),
+      }));
+    }
+
     return res.json({
       success: true,
-      data: [
-        { keyword: 'phở bò', count: 142, change_pct: 12.5 },
-        { keyword: 'thịt kho tàu', count: 98, change_pct: 8.2 },
-        { keyword: 'canh chua', count: 85, change_pct: -3.1 },
-        { keyword: 'món chay', count: 74, change_pct: 25.0 },
-        { keyword: 'gà rán', count: 62, change_pct: 5.4 },
-      ]
+      data: trends,
     });
   } catch (err) {
     next(err);

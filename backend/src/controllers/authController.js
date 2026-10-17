@@ -21,21 +21,38 @@ const RESET_TOKEN_EXPIRES_MINUTES = 15;
 export async function register(req, res) {
   const { email, password, displayName, phone } = req.body;
 
-  // Validate đầu vào cơ bản
+  // Validate đầu vào
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc.' });
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Email và mật khẩu là bắt buộc.' },
+    });
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Mật khẩu phải có ít nhất 6 ký tự.' });
+
+  if (!isValidEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Email không đúng định dạng.' },
+    });
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'Email không đúng định dạng.' });
+
+  // Thống nhất quy tắc mật khẩu mạnh dùng chung isStrongPassword
+  if (!isStrongPassword(password)) {
+    return res.status(422).json({
+      success: false,
+      error: {
+        code: 'WEAK_PASSWORD',
+        message: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số.',
+        details: [{ field: 'password', code: 'WEAK_PASSWORD', message: 'Mật khẩu phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số.' }],
+      },
+    });
   }
 
   try {
     const result = await registerUser({ email, password, displayName, phone });
 
     return res.status(201).json({
+      success: true,
       message: 'Đăng ký thành công!',
       user: result.user,
       // Trả token nếu Supabase auto-confirm (không cần verify email)
@@ -44,10 +61,16 @@ export async function register(req, res) {
     });
   } catch (err) {
     if (err.message === 'EMAIL_EXISTS') {
-      return res.status(409).json({ error: 'Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng email khác.' });
+      return res.status(409).json({
+        success: false,
+        error: { code: 'EMAIL_EXISTS', message: 'Email này đã được đăng ký. Vui lòng đăng nhập hoặc dùng email khác.' },
+      });
     }
     console.error('Register error:', err);
-    return res.status(500).json({ error: err.message || 'Đăng ký thất bại. Vui lòng thử lại.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Đăng ký thất bại. Vui lòng thử lại sau.' },
+    });
   }
 }
 
@@ -56,13 +79,17 @@ export async function login(req, res) {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email và mật khẩu là bắt buộc.' });
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Email và mật khẩu là bắt buộc.' },
+    });
   }
 
   try {
     const result = await loginUser({ email, password });
 
     return res.status(200).json({
+      success: true,
       message: 'Đăng nhập thành công!',
       user: result.user,
       accessToken: result.accessToken,
@@ -71,13 +98,22 @@ export async function login(req, res) {
     });
   } catch (err) {
     if (err.message === 'INVALID_CREDENTIALS') {
-      return res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác.' });
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_CREDENTIALS', message: 'Email hoặc mật khẩu không chính xác.' },
+      });
     }
     if (err.message === 'ACCOUNT_LOCKED') {
-      return res.status(403).json({ error: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.' });
+      return res.status(403).json({
+        success: false,
+        error: { code: 'ACCOUNT_LOCKED', message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.' },
+      });
     }
     console.error('Login error:', err);
-    return res.status(500).json({ error: err.message || 'Đăng nhập thất bại. Vui lòng thử lại.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'Đăng nhập thất bại. Vui lòng thử lại sau.' },
+    });
   }
 }
 

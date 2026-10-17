@@ -107,60 +107,21 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Khởi tạo state trống, sẵn sàng kết nối CSDL và API backend
-  // Đồng thời dọn dẹp các ID dữ liệu mẫu cũ (dish-*, user-*, rev-*, log-*) nếu còn lưu trong localStorage
-  const [users, setUsers] = useState<User[]>(() => {
-    try {
-      const saved = localStorage.getItem('culina_users');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed.filter((u: User) => !u.id.startsWith('user-')) : [];
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+  // Khởi tạo state chuẩn từ API, không lưu đè dữ liệu món ăn/người dùng vào localStorage
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  // Dọn dẹp các key localStorage cũ từ thời mockup
+  useEffect(() => {
     try {
-      const savedId = localStorage.getItem('culina_current_user_id');
-      if (!savedId || savedId === 'guest' || savedId.startsWith('user-')) return null;
-      const savedUsers = localStorage.getItem('culina_users');
-      if (savedUsers) {
-        const parsed: User[] = JSON.parse(savedUsers);
-        return parsed.find((u) => u.id === savedId) || null;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [dishes, setDishes] = useState<Dish[]>(() => {
-    try {
-      const saved = localStorage.getItem('culina_dishes');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed.filter((d: Dish) => !d.id.startsWith('dish-')) : [];
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [reviews, setReviews] = useState<Review[]>(() => {
-    try {
-      const saved = localStorage.getItem('culina_reviews');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed.filter((r: Review) => !r.id.startsWith('rev-')) : [];
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+      localStorage.removeItem('culina_users');
+      localStorage.removeItem('culina_dishes');
+      localStorage.removeItem('culina_reviews');
+      localStorage.removeItem('culina_current_user_id');
+    } catch {}
+  }, []);
 
   const [chatLogs, setChatLogs] = useState<ChatLogRecord[]>(() => {
     try {
@@ -307,30 +268,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Persistence effects
-  useEffect(() => {
-    try {
-      localStorage.setItem('culina_users', JSON.stringify(users));
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
-  }, [users]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('culina_dishes', JSON.stringify(dishes));
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
-  }, [dishes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('culina_reviews', JSON.stringify(reviews));
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
-  }, [reviews]);
 
   useEffect(() => {
     try {
@@ -367,39 +305,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthLoading(true);
     apiGetMe()
       .then((apiUser: AuthUser) => {
-        const savedId = apiUser.id;
-        const savedUsers = localStorage.getItem('culina_users');
-        let existing: User | undefined;
-        if (savedUsers) {
-          try {
-            const parsed: User[] = JSON.parse(savedUsers);
-            existing = parsed.find((u) => u.id === savedId);
-          } catch {}
-        }
-
         const restoredUser: User = {
           id: apiUser.id,
           email: apiUser.email,
           name: apiUser.displayName,
           role: apiUser.role as 'user' | 'admin',
-          avatar: existing?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(apiUser.displayName)}&background=0D9488&color=fff`,
-          phone: existing?.phone || '',
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(apiUser.displayName)}&background=0D9488&color=fff`,
+          phone: '',
           status: 'active',
-          createdAt: apiUser.createdAt ?? existing?.createdAt ?? new Date().toISOString(),
+          createdAt: apiUser.createdAt ?? new Date().toISOString(),
           tasteProfile: {
             name: apiUser.displayName,
-            diet: existing?.tasteProfile?.diet || 'Bình thường',
-            allergies: existing?.tasteProfile?.allergies || [],
-            dislikes: existing?.tasteProfile?.dislikes || [],
-            spiceTolerance: existing?.tasteProfile?.spiceTolerance || 'Cay nhẹ',
-            targetCalories: existing?.tasteProfile?.targetCalories || 1800,
-            healthGoal: existing?.tasteProfile?.healthGoal || 'Duy trì vóc dáng & ăn ngon',
-            favoriteCuisines: existing?.tasteProfile?.favoriteCuisines || ['Việt Nam'],
-            waterTargetLiters: existing?.tasteProfile?.waterTargetLiters || 2.0,
-            dailyMealsCount: existing?.tasteProfile?.dailyMealsCount || 3,
+            diet: 'Bình thường',
+            allergies: [],
+            dislikes: [],
+            spiceTolerance: 'Cay nhẹ',
+            targetCalories: 1800,
+            healthGoal: 'Duy trì vóc dáng & ăn ngon',
+            favoriteCuisines: ['Việt Nam'],
+            waterTargetLiters: 2.0,
+            dailyMealsCount: 3,
           },
-          favorites: existing?.favorites || [],
-          mealHistory: existing?.mealHistory || [],
+          favorites: [],
+          mealHistory: [],
         };
 
         setCurrentUser(restoredUser);
@@ -425,39 +353,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const result = await apiLogin({ email, password: password ?? '' });
 
-      // Map AuthUser → User
-      const savedUsers = localStorage.getItem('culina_users');
-      let existing: User | undefined;
-      if (savedUsers) {
-        try {
-          const parsed: User[] = JSON.parse(savedUsers);
-          existing = parsed.find((u) => u.id === result.user.id);
-        } catch {}
-      }
-
       const loggedInUser: User = {
         id: result.user.id,
         email: result.user.email,
         name: result.user.displayName,
         role: result.user.role as 'user' | 'admin',
-        avatar: existing?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.displayName)}&background=0D9488&color=fff`,
-        phone: existing?.phone || '',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(result.user.displayName)}&background=0D9488&color=fff`,
+        phone: '',
         status: 'active',
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         tasteProfile: {
           name: result.user.displayName,
-          diet: existing?.tasteProfile?.diet || 'Bình thường',
-          allergies: existing?.tasteProfile?.allergies || [],
-          dislikes: existing?.tasteProfile?.dislikes || [],
-          spiceTolerance: existing?.tasteProfile?.spiceTolerance || 'Cay nhẹ',
-          targetCalories: existing?.tasteProfile?.targetCalories || 1800,
-          healthGoal: existing?.tasteProfile?.healthGoal || 'Duy trì vóc dáng & ăn ngon',
-          favoriteCuisines: existing?.tasteProfile?.favoriteCuisines || ['Việt Nam'],
-          waterTargetLiters: existing?.tasteProfile?.waterTargetLiters || 2.0,
-          dailyMealsCount: existing?.tasteProfile?.dailyMealsCount || 3,
+          diet: 'Bình thường',
+          allergies: [],
+          dislikes: [],
+          spiceTolerance: 'Cay nhẹ',
+          targetCalories: 1800,
+          healthGoal: 'Duy trì vóc dáng & ăn ngon',
+          favoriteCuisines: ['Việt Nam'],
+          waterTargetLiters: 2.0,
+          dailyMealsCount: 3,
         },
-        favorites: existing?.favorites || [],
-        mealHistory: existing?.mealHistory || [],
+        favorites: [],
+        mealHistory: [],
       };
 
       setCurrentUser(loggedInUser);
@@ -469,7 +387,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Đăng nhập thất bại.';
+      const anyErr = err as any;
+      const msg = anyErr?.error?.message || anyErr?.message || (err instanceof Error ? err.message : 'Đăng nhập thất bại.');
       setAuthError(msg);
       return false;
     } finally {
@@ -545,7 +464,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAuthModalType(null);
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Đăng ký thất bại.';
+      const anyErr = err as any;
+      const msg = anyErr?.error?.message || anyErr?.message || (err instanceof Error ? err.message : 'Đăng ký thất bại.');
       setAuthError(msg);
       return false;
     } finally {

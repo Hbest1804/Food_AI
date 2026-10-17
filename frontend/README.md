@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# CulinaAI Frontend
 
-# Run and deploy your AI Studio app
+Giao diện người dùng cho hệ thống **Trợ lý Ẩm thực Thông minh CulinaAI**, xây dựng bằng React 19, TypeScript, Tailwind CSS v4 và Vite.
 
-This contains everything you need to run your app locally.
+## Tính năng chính
+- 🍜 **Khám phá món ăn (Browse View):** Tìm kiếm, lọc theo vùng miền, danh mục, độ khó, thời gian chế biến, calo.
+- 🤖 **Chatbot AI ẩm thực:** Hỗ trợ chế độ khách (Guest Chat có rate limit) và chế độ thành viên cá nhân hóa (Personalized Chat theo khẩu vị).
+- 🧊 **Tủ lạnh thông minh (Fridge Search):** Gợi ý công thức món ăn dựa trên nguyên liệu sẵn có trong tủ lạnh.
+- 🎯 **Gợi ý món ăn cá nhân hóa (Recommendations):** Tính điểm tương đồng dựa trên hồ sơ khẩu vị, dị ứng, mục tiêu sức khỏe và lượng calo hàng ngày.
+- 👑 **Phân hệ Quản trị (Admin Portal):** Quản lý món ăn, công thức chi tiết, nguyên liệu, master data, giám sát chatbot và thống kê hệ thống thời gian thực.
 
-View your app in AI Studio: https://ai.studio/apps/098c7a49-e8d8-46f3-9e26-626d7e7ddfc6
+## Cài đặt và chạy
 
-## Run Locally
+```bash
+# 1. Cài đặt dependencies
+npm install
 
-**Prerequisites:**  Node.js
+# 2. Khởi chạy môi trường phát triển
+npm run dev
 
+# 3. Build production bundle
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Môi trường (.env)
+- `VITE_API_URL`: Địa chỉ API Backend (mặc định: `http://localhost:5000`)

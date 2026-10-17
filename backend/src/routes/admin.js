@@ -4,17 +4,6 @@
 import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middlewares/authMiddleware.js';
 import {
-  // UC10 – Dữ liệu cá nhân
-  getMyProfile,
-  updateMyProfile,
-  changeMyPassword,
-  deleteMyAccount,
-  getMyFavorites,
-  clearMyFavorites,
-  getMyRatings,
-  getMyViewHistory,
-  clearMyViewHistory,
-  deleteMyChatHistory,
   // UC11 – Quản lý món ăn
   adminGetDishes,
   adminCreateDish,
@@ -59,28 +48,12 @@ import {
   adminUpdateCategory,
   adminDeleteCategory,
 } from '../controllers/adminController.js';
-import { handleAvatarUpload, handleDishImageUpload } from '../middlewares/uploadMiddleware.js';
-import { uploadUserAvatar, uploadDishImage } from '../controllers/uploadController.js';
+import { handleDishImageUpload } from '../middlewares/uploadMiddleware.js';
+import { uploadDishImage } from '../controllers/uploadController.js';
 
 const router = Router();
 
-// ─── UC10: Dữ liệu cá nhân (yêu cầu đăng nhập, không cần admin) ──────────────
-router.get('/me/profile', authenticate, getMyProfile);
-router.get('/me', authenticate, getMyProfile);
-router.put('/me/profile', authenticate, updateMyProfile);
-router.patch('/me', authenticate, updateMyProfile);
-router.patch('/me/password', authenticate, changeMyPassword);
-router.put('/me/password', authenticate, changeMyPassword);
-router.delete('/me', authenticate, deleteMyAccount);
-router.get('/me/favorites', authenticate, getMyFavorites);
-router.delete('/me/favorites', authenticate, clearMyFavorites);
-router.get('/me/ratings', authenticate, getMyRatings);
-router.get('/me/view-history', authenticate, getMyViewHistory);
-router.delete('/me/view-history', authenticate, clearMyViewHistory);
-router.delete('/me/chat-history', authenticate, deleteMyChatHistory);
-router.post('/me/avatar', authenticate, handleAvatarUpload, uploadUserAvatar);
-
-// ─── Bảo vệ tất cả route dưới đây: phải là admin ─────────────────────────────
+// ─── Bảo vệ tất cả route quản trị dưới đây: bắt buộc phải có quyền Admin ─────
 router.use('/admin', authenticate, requireAdmin);
 
 // UC11 – Upload hình ảnh món ăn

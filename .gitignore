@@ -5,6 +5,6 @@ doc_api.txt
 *.sql
 backend/schema_chatbot_am_thuc.sql
 diagram.png
-backend/src/scripts/
+backend/src/scripts/test*
 htdb.png
 *.zip

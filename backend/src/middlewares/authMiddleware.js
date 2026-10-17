@@ -2,10 +2,11 @@
 // Xác thực JWT (Bearer token) từ Supabase Auth cho các route được bảo vệ
 
 import { supabase, supabaseAdmin } from '../config/supabase.js';
+import { isTokenRevoked } from '../services/authService.js';
 
 /**
  * Middleware xác thực JWT.
- * Gắn `req.user` nếu token hợp lệ, trả 401 nếu không có / hết hạn.
+ * Gắn `req.user` nếu token hợp lệ, trả 401 nếu không có / hết hạn / đã thu hồi.
  */
 export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -18,6 +19,14 @@ export async function authenticate(req, res, next) {
   }
 
   const token = authHeader.slice(7); // bỏ 'Bearer '
+
+  // Kiểm tra token đã bị thu hồi do đăng xuất chưa
+  if (isTokenRevoked(token)) {
+    return res.status(401).json({
+      success: false,
+      error: { code: 'TOKEN_REVOKED', message: 'Phiên làm việc đã kết thúc do bạn đã đăng xuất. Vui lòng đăng nhập lại.' },
+    });
+  }
 
   try {
     const { data: { user: authUser }, error } = await supabase.auth.getUser(token);
@@ -62,7 +71,10 @@ export async function authenticate(req, res, next) {
     next();
   } catch (err) {
     console.error('Auth middleware error:', err);
-    return res.status(500).json({ error: 'Lỗi xác thực nội bộ.' });
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_AUTH_ERROR', message: 'Lỗi xác thực nội bộ.' },
+    });
   }
 }
 
@@ -72,7 +84,10 @@ export async function authenticate(req, res, next) {
  */
 export function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Bạn không có quyền truy cập khu vực này.' });
+    return res.status(403).json({
+      success: false,
+      error: { code: 'FORBIDDEN', message: 'Bạn không có quyền truy cập khu vực này.' },
+    });
   }
   next();
 }
@@ -90,6 +105,11 @@ export async function optionalAuthenticate(req, _res, next) {
   }
 
   const token = authHeader.slice(7);
+
+  if (isTokenRevoked(token)) {
+    req.user = null;
+    return next();
+  }
 
   try {
     const { data: { user: authUser }, error } = await supabase.auth.getUser(token);

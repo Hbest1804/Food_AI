@@ -197,8 +197,9 @@ export const PersonalDataModal: React.FC = () => {
     e.preventDefault();
     setPasswordMessage(null);
 
-    if (newPassword.length < 8) {
-      setPasswordMessage({ type: 'error', text: 'Mật khẩu mới phải có ít nhất 8 ký tự.' });
+    const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(newPassword);
+    if (!isStrong) {
+      setPasswordMessage({ type: 'error', text: 'Mật khẩu mới phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số.' });
       return;
     }
 
@@ -731,7 +732,7 @@ export const PersonalDataModal: React.FC = () => {
                       Đổi mật khẩu tài khoản
                     </h3>
                     <p className="text-[11px] text-stone-500">
-                      Mật khẩu mới yêu cầu tối thiểu 8 ký tự
+                      Mật khẩu mới yêu cầu tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số
                     </p>
                   </div>
                 </div>
@@ -779,7 +780,7 @@ export const PersonalDataModal: React.FC = () => {
                         onChange={(e) => setNewPassword(e.target.value)}
                         required
                         minLength={8}
-                        placeholder="Tối thiểu 8 ký tự"
+                        placeholder="Tối thiểu 8 ký tự (hoa, thường, số)"
                         className="w-full text-xs sm:text-sm p-2.5 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
                       />
                     </div>

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabase.js';
+import { sanitizeSearchKeyword } from '../utils/validators.js';
 
 /**
  * 4.2.2 Tìm nguyên liệu (autocomplete & lấy nguyên liệu phổ biến cho tủ lạnh)
@@ -19,7 +20,8 @@ export const getIngredients = async (req, res, next) => {
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
     const offset = (pageNum - 1) * limitNum;
 
-    const keyword = typeof q === 'string' ? q.trim() : '';
+    // Làm sạch từ khóa để ngăn chặn PostgREST filter injection (ký tự , ( ) . % " ' { } :)
+    const keyword = sanitizeSearchKeyword(q);
     const filterCommon = is_common === 'true' || is_common === true;
 
     // Chuỗi select chuẩn theo tài liệu (bao gồm id, name của allergen_group)
