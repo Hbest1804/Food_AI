@@ -260,6 +260,10 @@ export const DishDetailModal: React.FC = () => {
             src={detailData?.image_url || dish.image}
             alt={dish.name}
             className="w-full h-full object-cover opacity-90"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1000&q=80';
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/40 to-transparent" />
 
@@ -288,20 +292,16 @@ export const DishDetailModal: React.FC = () => {
           {/* Bottom Title Info */}
           <div className="absolute bottom-4 left-4 right-4 text-white">
             <div className="flex items-center gap-2 text-xs font-semibold text-amber-300 mb-1 flex-wrap">
-              <span>{detailData?.region?.name || dish.cuisine}</span>
               {detailData?.category && (
-                <>
-                  <span>·</span>
-                  <span>{detailData.category.name}</span>
-                </>
+                <span>{detailData.category.name}</span>
               )}
               {detailData?.tags && detailData.tags.length > 0 && (
                 <>
-                  <span>·</span>
+                  {detailData?.category && <span>·</span>}
                   <span>{detailData.tags.map((t) => t.name).join(', ')}</span>
                 </>
               )}
-              <span>·</span>
+              {(detailData?.category || (detailData?.tags && detailData.tags.length > 0)) && <span>·</span>}
               <span className="capitalize">{dish.difficulty}</span>
             </div>
             <h2 className="text-xl sm:text-3xl font-serif font-bold text-white tracking-tight">

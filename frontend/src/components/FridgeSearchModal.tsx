@@ -167,7 +167,7 @@ export const FridgeSearchModal: React.FC = () => {
     if (selectedIngredients.length > 0) {
       const ingNames = selectedIngredients.map((i) => i.name).join(', ');
       openChatWithPrompt(
-        `Tôi đang có các nguyên liệu trong tủ lạnh gồm: ${ingNames}. Bạn hãy gợi ý hoặc sáng tạo công thức món ăn mới phù hợp và hướng dẫn chi tiết cách nấu cho tôi nhé!`,
+        `Tôi đang có các nguyên liệu có sẵn gồm: ${ingNames}. Bạn hãy gợi ý hoặc sáng tạo công thức món ăn mới phù hợp và hướng dẫn chi tiết cách nấu cho tôi nhé!`,
         fridgePayload
       );
     } else {
@@ -186,7 +186,7 @@ export const FridgeSearchModal: React.FC = () => {
             </div>
             <div>
               <h2 className="text-lg font-serif font-bold text-stone-900">
-                Tủ Lạnh Thông Minh (Tìm món & Chống lãng phí)
+                Nguyên liệu có sẵn
               </h2>
               <p className="text-xs text-stone-500">
                 Chọn các nguyên liệu bạn đang có sẵn, hệ thống sẽ đối chiếu công thức và xếp hạng món nấu được
@@ -242,7 +242,7 @@ export const FridgeSearchModal: React.FC = () => {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                placeholder="Nhập nguyên liệu khác trong tủ lạnh (vd: cà chua, tỏi, nước mắm)..."
+                placeholder="Nhập nguyên liệu khác có sẵn (vd: cà chua, tỏi, nước mắm)..."
                 className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-white"
               />
               <button
@@ -281,7 +281,7 @@ export const FridgeSearchModal: React.FC = () => {
           <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-emerald-950">
-                Đang có trong tủ lạnh ({selectedIngredients.length}):
+                Nguyên liệu đang có ({selectedIngredients.length}):
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {selectedIngredients.map((item) => (
@@ -347,7 +347,7 @@ export const FridgeSearchModal: React.FC = () => {
             {isLoadingDishes ? (
               <div className="py-12 flex flex-col items-center justify-center text-stone-500 gap-2">
                 <Loader2 className="w-6 h-6 animate-spin text-emerald-700" />
-                <p className="text-xs font-medium">Đang tìm các món phù hợp với tủ lạnh của bạn...</p>
+                <p className="text-xs font-medium">Đang tìm các món phù hợp với nguyên liệu của bạn...</p>
               </div>
             ) : matchedDishes.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -388,7 +388,7 @@ export const FridgeSearchModal: React.FC = () => {
                 </h4>
                 <p className="text-xs text-stone-500 max-w-md mx-auto">
                   {suggestAi
-                    ? 'Bạn có thể nhờ Trợ lý AI sáng tạo món ăn hoàn toàn mới từ các nguyên liệu đang có trong tủ lạnh!'
+                    ? 'Bạn có thể nhờ Trợ lý AI sáng tạo món ăn hoàn toàn mới từ các nguyên liệu đang có sẵn!'
                     : 'Thử thêm các nguyên liệu thông dụng khác hoặc bỏ bộ lọc 100% để xem thêm gợi ý.'}
                 </p>
 
@@ -404,7 +404,7 @@ export const FridgeSearchModal: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 text-center bg-stone-50 rounded-2xl border border-stone-200 text-stone-500 text-xs">
-                Chọn ít nhất 1 nguyên liệu phía trên để bắt đầu tìm món nấu được từ tủ lạnh của bạn.
+                Chọn ít nhất 1 nguyên liệu phía trên để bắt đầu tìm món nấu được từ nguyên liệu có sẵn.
               </div>
             )}
           </div>

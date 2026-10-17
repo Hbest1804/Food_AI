@@ -131,7 +131,7 @@ export async function sendGuestMessage(req, res, next) {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'Danh sách nguyên liệu trong tủ lạnh không được vượt quá 20 nguyên liệu.',
+            message: 'Danh sách nguyên liệu có sẵn không được vượt quá 20 nguyên liệu.',
           },
         });
       }

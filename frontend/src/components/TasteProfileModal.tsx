@@ -312,7 +312,7 @@ export const TasteProfileModal: React.FC = () => {
     setServerDetails(null);
 
     const payload: SaveTasteProfilePayload = {
-      preferred_region_id: preferredRegionId,
+      preferred_region_id: null,
       taste_prefs: {
         spicy_level: Number(spicyLevel),
         salty_level: Number(saltyLevel),
@@ -403,39 +403,12 @@ export const TasteProfileModal: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* 1. Vùng miền ưa thích */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-teal-700" />
-                  1. Vùng miền ẩm thực ưa thích
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(meta?.regions || []).map((reg) => {
-                    const isSelected = preferredRegionId === reg.id;
-                    return (
-                      <button
-                        key={reg.id}
-                        type="button"
-                        onClick={() => setPreferredRegionId(isSelected ? null : reg.id)}
-                        className={`p-2.5 rounded-xl text-xs font-semibold text-center transition-all border cursor-pointer ${
-                          isSelected
-                            ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
-                            : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700'
-                        }`}
-                      >
-                        {reg.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 2. Chế độ ăn uống (Vừa chọn có sẵn vừa tìm kiếm lọc) */}
+              {/* 1. Chế độ ăn uống (Vừa chọn có sẵn vừa tìm kiếm lọc) */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
                     <Utensils className="w-4 h-4 text-teal-700" />
-                    2. Chế độ ăn uống hiện tại
+                    1. Chế độ ăn uống hiện tại
                   </label>
                   <div className="relative">
                     <input
@@ -481,12 +454,12 @@ export const TasteProfileModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. Dị ứng thực phẩm cần tránh */}
+              {/* 2. Dị ứng thực phẩm cần tránh */}
               <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
                     <AlertOctagon className="w-4 h-4 text-amber-600" />
-                    3. Dị ứng thực phẩm cần tránh
+                    2. Dị ứng thực phẩm cần tránh
                   </label>
                   <div className="relative">
                     <input
@@ -535,11 +508,11 @@ export const TasteProfileModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* 4. Mức độ ưa thích vị (0 - 5) */}
+              {/* 3. Mức độ ưa thích vị (0 - 5) */}
               <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3.5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
                   <Flame className="w-4 h-4 text-teal-700" />
-                  4. Mức độ ưa thích vị (Thang điểm 0 - 5)
+                  3. Mức độ ưa thích vị (Thang điểm 0 - 5)
                 </label>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -629,14 +602,14 @@ export const TasteProfileModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* 5. Nguyên liệu yêu thích & Nguyên liệu kiêng (Vừa nhập tìm kiếm vừa chọn gợi ý) */}
+              {/* 4. Nguyên liệu yêu thích & Nguyên liệu kiêng (Vừa nhập tìm kiếm vừa chọn gợi ý) */}
               <div className="space-y-4">
-                {/* 5a. Nguyên liệu yêu thích */}
+                {/* 4a. Nguyên liệu yêu thích */}
                 <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
                       <Heart className="w-4 h-4 text-emerald-600" />
-                      5a. Nguyên liệu yêu thích
+                      4a. Nguyên liệu yêu thích
                     </label>
                     <span className="text-[11px] text-emerald-700 font-medium">
                       Đã chọn: {likedIngredientIds.length}
@@ -742,12 +715,12 @@ export const TasteProfileModal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 5b. Nguyên liệu kiêng / không thích ăn */}
+                {/* 4b. Nguyên liệu kiêng / không thích ăn */}
                 <div className="p-4 rounded-2xl bg-stone-100/70 border border-stone-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
                       <AlertCircle className="w-4 h-4 text-stone-500" />
-                      5b. Nguyên liệu kiêng / không thích ăn
+                      4b. Nguyên liệu kiêng / không thích ăn
                     </label>
                     <span className="text-[11px] text-stone-500 font-medium">
                       Đã chọn: {dislikedIngredientIds.length}
@@ -864,12 +837,12 @@ export const TasteProfileModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* 6. Mục tiêu Calo & Ngân sách mỗi bữa & Số người (Vừa chọn gợi ý vừa tự nhập) */}
+              {/* 5. Mục tiêu Calo & Ngân sách mỗi bữa & Số người (Vừa chọn gợi ý vừa tự nhập) */}
               <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
                     <Activity className="w-4 h-4 text-teal-700" />
-                    6. Mục tiêu Calo, Ngân sách & Quy mô bữa ăn
+                    5. Mục tiêu Calo, Ngân sách & Quy mô bữa ăn
                   </label>
                   <span className="text-[11px] text-teal-800 font-semibold">Vừa chọn gợi ý vừa tự nhập</span>
                 </div>

@@ -134,7 +134,7 @@ export async function apiSendGuestMessage(
   const res = await axiosClient.post<ApiResponse<GuestChatResponse>>(
     '/api/chat/guest/messages',
     params,
-    { headers }
+    { headers, timeout: 45_000 }
   );
 
   if (res.data?.data?.guest_id) {
@@ -194,7 +194,8 @@ export async function apiSendChatMessage(
 ): Promise<ApiResponse<SendMessageResponseData>> {
   const res = await axiosClient.post<ApiResponse<SendMessageResponseData>>(
     `/api/chat/sessions/${sessionId}/messages`,
-    params
+    params,
+    { timeout: 45_000 }
   );
   return res.data;
 }

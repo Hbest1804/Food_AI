@@ -25,7 +25,7 @@ import {
   RecommendationMeta,
 } from '../api/recommendationsApi';
 import { dishListItemToDish } from '../utils/dishAdapter';
-import { metaApi, RegionItem, CategoryItem } from '../api/metaApi';
+import { metaApi, CategoryItem } from '../api/metaApi';
 
 export const RecommendationsView: React.FC = () => {
   const {
@@ -46,16 +46,13 @@ export const RecommendationsView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Filter state
-  const [regions, setRegions] = useState<RegionItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [selectedRegionId, setSelectedRegionId] = useState<number | undefined>(undefined);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
 
-  // Tải danh mục và vùng miền tra cứu
+  // Tải danh mục tra cứu
   useEffect(() => {
-    Promise.all([metaApi.getRegions(), metaApi.getCategories()])
-      .then(([regRes, catRes]) => {
-        if (regRes.success) setRegions(regRes.data);
+    metaApi.getCategories()
+      .then((catRes) => {
         if (catRes.success) setCategories(catRes.data);
       })
       .catch((err) => console.warn('Lỗi tải danh mục meta:', err));
@@ -78,7 +75,6 @@ export const RecommendationsView: React.FC = () => {
         try {
           const res = await recommendationsApi.getRecommendations({
             limit: 16,
-            region_id: selectedRegionId,
             category_id: selectedCategoryId,
             refresh,
           });
@@ -94,9 +90,6 @@ export const RecommendationsView: React.FC = () => {
         // Nếu API chưa có dữ liệu hoặc lỗi mạng, dự phòng hiển thị từ kho dishes của AppContext
         if (items.length === 0 && dishes.length > 0) {
           let filtered = dishes.filter((d) => d.isPublished !== false);
-          if (selectedRegionId) {
-            filtered = filtered.filter((d) => d.region?.id === selectedRegionId);
-          }
           if (selectedCategoryId) {
             filtered = filtered.filter((d) => d.category?.id === selectedCategoryId);
           }
@@ -145,7 +138,7 @@ export const RecommendationsView: React.FC = () => {
         setIsRefreshing(false);
       }
     },
-    [currentUser, dishes, calculateDishMatchScore, selectedRegionId, selectedCategoryId]
+    [currentUser, dishes, calculateDishMatchScore, selectedCategoryId]
   );
 
   useEffect(() => {
@@ -186,7 +179,7 @@ export const RecommendationsView: React.FC = () => {
         <div className="relative z-10 max-w-4xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-900/70 backdrop-blur-md text-emerald-200 text-xs font-semibold mb-3 border border-teal-500/30">
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Gợi Ý Cá Nhân Hóa Dinh Dưỡng (UC08)</span>
+            <span>Gợi Ý Cá Nhân Hóa Dinh Dưỡng</span>
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-serif font-bold tracking-tight text-white leading-tight">
@@ -260,7 +253,7 @@ export const RecommendationsView: React.FC = () => {
               <div className="bg-teal-950/50 backdrop-blur-md p-2.5 rounded-xl border border-teal-700/30">
                 <span className="text-[10px] text-teal-300 block uppercase font-semibold">Chiến lược</span>
                 <span className="font-bold text-white text-xs">
-                  {meta?.strategy === 'personalized' ? '🎯 Cá nhân hóa (UC08)' : '🌟 Phổ biến (Luồng 3a)'}
+                  {meta?.strategy === 'personalized' ? '🎯 Cá nhân hóa' : '🌟 Món phổ biến'}
                 </span>
               </div>
               <div className="bg-teal-950/50 backdrop-blur-md p-2.5 rounded-xl border border-teal-700/30">
@@ -309,7 +302,7 @@ export const RecommendationsView: React.FC = () => {
         </div>
       )}
 
-      {/* Bộ lọc nhanh Category & Region */}
+      {/* Bộ lọc nhanh Category */}
       <div className="flex items-center justify-between gap-3 flex-wrap bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
           <Filter className="w-4 h-4 text-teal-700" />
@@ -317,20 +310,6 @@ export const RecommendationsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Region filter */}
-          <select
-            value={selectedRegionId || ''}
-            onChange={(e) => setSelectedRegionId(e.target.value ? Number(e.target.value) : undefined)}
-            className="text-xs px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-50 focus:outline-hidden focus:ring-1 focus:ring-teal-500 font-medium text-slate-700 cursor-pointer"
-          >
-            <option value="">Tất cả vùng miền</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-
           {/* Category filter */}
           <select
             value={selectedCategoryId || ''}
@@ -345,10 +324,9 @@ export const RecommendationsView: React.FC = () => {
             ))}
           </select>
 
-          {(selectedRegionId || selectedCategoryId) && (
+          {selectedCategoryId && (
             <button
               onClick={() => {
-                setSelectedRegionId(undefined);
                 setSelectedCategoryId(undefined);
               }}
               className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 cursor-pointer"
@@ -431,11 +409,10 @@ export const RecommendationsView: React.FC = () => {
             Không tìm thấy món phù hợp với bộ lọc
           </h3>
           <p className="text-xs text-slate-500 mb-4">
-            Hãy thử nới lỏng các tiêu chí vùng miền hoặc loại món để nhận thêm các đề xuất phong phú khác.
+            Hãy thử chọn tất cả loại món để nhận thêm các đề xuất phong phú khác.
           </p>
           <button
             onClick={() => {
-              setSelectedRegionId(undefined);
               setSelectedCategoryId(undefined);
             }}
             className="px-4 py-2 bg-teal-800 text-white text-xs font-bold rounded-xl cursor-pointer"
@@ -463,6 +440,10 @@ export const RecommendationsView: React.FC = () => {
                     alt={dish.name}
                     className="w-full h-full object-cover group-hover:scale-106 transition-transform duration-700 ease-out"
                     loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1000&q=80';
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-black/10 opacity-60" />
 

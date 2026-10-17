@@ -9,7 +9,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
 const axiosClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 15_000,          // 15 giây
+  timeout: 35_000,          // 35 giây (tránh timeout khi AI sinh câu trả lời dài)
   headers: {
     'Content-Type': 'application/json',
   },

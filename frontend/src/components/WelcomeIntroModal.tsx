@@ -70,14 +70,14 @@ const INTRO_SLIDES: Slide[] = [
     badge: 'Nấu ăn chống lãng phí',
     badgeIcon: <Refrigerator className="w-3.5 h-3.5 text-teal-600" />,
     badgeColor: 'bg-teal-50 text-teal-900 border-teal-200',
-    title: 'Tủ Lạnh Thông Minh & Hẹn Giờ Công Đoạn 🧊⏱️',
+    title: 'Nguyên Liệu Có Sẵn & Hẹn Giờ Công Đoạn ⏱️',
     description:
-      'Tận dụng nguyên liệu sẵn có trong tủ lạnh để sáng tạo món ngon, kèm Chế độ Nấu ăn Tập trung có chuông đếm ngược cho từng bước nấu.',
+      'Tận dụng nguyên liệu có sẵn để tìm và sáng tạo món ngon, kèm Chế độ Nấu ăn Tập trung có chuông đếm ngược cho từng bước nấu.',
     icon: <Refrigerator className="w-10 h-10 text-white" />,
     iconBg: 'bg-gradient-to-tr from-teal-900 to-emerald-800',
     graphic: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=800&q=80',
     highlights: [
-      'Tìm món từ nguyên liệu còn thừa trong tủ lạnh',
+      'Tìm món từ nguyên liệu có sẵn',
       'Bộ hẹn giờ đếm ngược từng bước không lo thức ăn quá lửa',
       'Tự động ghi nhận Calo vào Nhật ký ẩm thực cá nhân',
     ],

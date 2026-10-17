@@ -16,7 +16,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { dishesApi, DishListItem } from '../api/dishesApi';
-import { metaApi, MetaCategory, MetaRegion } from '../api/metaApi';
+import { metaApi, MetaCategory } from '../api/metaApi';
 import { dishListItemToDish } from '../utils/dishAdapter';
 import { Dish } from '../types';
 
@@ -27,7 +27,6 @@ export const BrowseView: React.FC = () => {
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [selectedRegionId, setSelectedRegionId] = useState<number | 'all'>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | 'all'>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | 'easy' | 'medium' | 'hard'>('all');
   const [selectedTimeRange, setSelectedTimeRange] = useState<'all' | '<15' | '15-30' | '>30'>('all');
@@ -36,7 +35,6 @@ export const BrowseView: React.FC = () => {
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
   // Dữ liệu bộ lọc động từ API /meta/filters
-  const [regions, setRegions] = useState<MetaRegion[]>([]);
   const [categories, setCategories] = useState<MetaCategory[]>([]);
 
   // Dữ liệu món ăn từ API /dishes
@@ -51,7 +49,6 @@ export const BrowseView: React.FC = () => {
       .getFilters()
       .then((res) => {
         if (res.success && res.data) {
-          setRegions(res.data.regions || []);
           setCategories(res.data.categories || []);
         }
       })
@@ -84,9 +81,6 @@ export const BrowseView: React.FC = () => {
 
       if (debouncedQuery) {
         params.q = debouncedQuery;
-      }
-      if (selectedRegionId !== 'all') {
-        params.region_id = selectedRegionId;
       }
       if (selectedCategoryId !== 'all') {
         params.category_id = selectedCategoryId;
@@ -137,7 +131,6 @@ export const BrowseView: React.FC = () => {
     }
   }, [
     debouncedQuery,
-    selectedRegionId,
     selectedCategoryId,
     selectedDifficulty,
     selectedTimeRange,
@@ -152,7 +145,6 @@ export const BrowseView: React.FC = () => {
   const resetFilters = () => {
     setSearchQuery('');
     setDebouncedQuery('');
-    setSelectedRegionId('all');
     setSelectedCategoryId('all');
     setSelectedDifficulty('all');
     setSelectedTimeRange('all');
@@ -162,7 +154,6 @@ export const BrowseView: React.FC = () => {
 
   const hasActiveFilters =
     searchQuery !== '' ||
-    selectedRegionId !== 'all' ||
     selectedCategoryId !== 'all' ||
     selectedDifficulty !== 'all' ||
     selectedTimeRange !== 'all' ||
@@ -211,10 +202,10 @@ export const BrowseView: React.FC = () => {
               <button
                 onClick={() => setIsFridgeModalOpen(true)}
                 className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0 cursor-pointer"
-                title="Tìm món từ nguyên liệu có sẵn trong tủ lạnh"
+                title="Tìm món theo nguyên liệu có sẵn"
               >
                 <ChefHat className="w-4 h-4 text-emerald-300" />
-                <span>Tủ lạnh</span>
+                <span>Nguyên liệu có sẵn</span>
               </button>
             </div>
           </div>
@@ -236,49 +227,20 @@ export const BrowseView: React.FC = () => {
 
         {/* Filter Controls Bar */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200 space-y-4">
-          {/* Row 1: Vùng miền (Region) Segmented Control */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
-                Vùng miền:
-              </span>
-              <button
-                onClick={() => setSelectedRegionId('all')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                  selectedRegionId === 'all'
-                    ? 'bg-teal-800 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-800'
-                }`}
-              >
-                Tất cả vùng
-              </button>
-              {regions.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => setSelectedRegionId(r.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                    selectedRegionId === r.id
-                      ? 'bg-teal-800 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-800'
-                  }`}
-                >
-                  {r.name}
-                </button>
-              ))}
-            </div>
-
+          <div className="flex items-center justify-between sm:hidden">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bộ lọc tìm kiếm</span>
             <button
               onClick={() => setShowFiltersMobile(!showFiltersMobile)}
-              className="sm:hidden px-3.5 py-2 text-xs font-semibold bg-slate-100 text-slate-700 rounded-xl flex items-center gap-1.5 border border-slate-200 cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-xl flex items-center gap-1.5 border border-slate-200 cursor-pointer"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-teal-700" />
-              <span>Bộ lọc nâng cao</span>
+              <span>{showFiltersMobile ? 'Thu gọn' : 'Mở rộng bộ lọc'}</span>
             </button>
           </div>
 
-          {/* Row 2: Secondary Dropdowns */}
+          {/* Secondary Dropdowns */}
           <div
-            className={`grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 ${
+            className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${
               showFiltersMobile ? 'block' : 'hidden sm:grid'
             }`}
           >
@@ -456,7 +418,7 @@ export const BrowseView: React.FC = () => {
               onClick={() => setIsFridgeModalOpen(true)}
               className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
             >
-              Mở Tủ lạnh thông minh
+              Mở Nguyên liệu có sẵn
             </button>
           </div>
         </div>

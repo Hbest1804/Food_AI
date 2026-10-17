@@ -44,6 +44,17 @@ interface ChatbotDrawerProps {
   isFullPage?: boolean;
 }
 
+/**
+ * Làm sạch chuỗi markdown, loại bỏ cú pháp rò rỉ mã ID như [Tên món](id:uuid) hoặc (id:uuid)
+ */
+function cleanDisplayContent(content: string): string {
+  if (!content) return '';
+  return content
+    .replace(/\[([^\]]+)\]\((?:id:)?(?:[a-f0-9\-]{8,36}|\d+)\)/gi, '**$1**')
+    .replace(/\s*[\(\[](?:id|ID):\s*[a-f0-9\-]{8,36}[\)\]]/gi, '')
+    .replace(/\s*\(id:[^\)]+\)/gi, '');
+}
+
 export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false }) => {
   const {
     currentUser,
@@ -75,8 +86,23 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
+
+  // Hiệu ứng các bước phản hồi trực quan theo thời gian thực
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingStep(0);
+      return;
+    }
+    const t1 = setTimeout(() => setLoadingStep(1), 1500);
+    const t2 = setTimeout(() => setLoadingStep(2), 3500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [isLoading]);
 
   // Feedback modal state (Mục 4.6.6)
   const [feedbackModalMessageId, setFeedbackModalMessageId] = useState<string | null>(null);
@@ -108,7 +134,7 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
       id: 'welcome',
       role: 'assistant',
       content: isGuest
-        ? `Chào bạn! Tôi là **CulinaAI** - Trợ lý Ẩm thực Tinh hoa 👨‍🍳🌿\n\nBạn đang ở **Chế độ Khách** (còn **${guestQueriesRemaining}** lượt hỏi thử nghiệm). Bạn có thể hỏi tôi bất kỳ công thức nấu ăn, mẹo làm bếp hoặc cách sơ chế món ngon từ nguyên liệu trong tủ lạnh!`
+        ? `Chào bạn! Tôi là **CulinaAI** - Trợ lý Ẩm thực Tinh hoa 👨‍🍳🌿\n\nBạn đang ở **Chế độ Khách** (còn **${guestQueriesRemaining}** lượt hỏi thử nghiệm). Bạn có thể hỏi tôi bất kỳ công thức nấu ăn, mẹo làm bếp hoặc cách sơ chế món ngon từ nguyên liệu có sẵn!`
         : `Chào **${currentUser?.name}**! Bếp trưởng **CulinaAI** rất vui được đồng hành cùng bạn theo chế độ **${dietName}** 🍲🌿\n\n${allergenList
           ? `🛡️ *Hệ thống đã kích hoạt bộ lọc bảo vệ: Loại bỏ hoàn toàn các món có liên quan đến ${allergenList}.*\n\n`
           : ''
@@ -404,12 +430,16 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
         };
         setMessages((prev) => [...prev, limitMsg]);
       } else {
-        const errorContent =
-          errCode === 'AI_TIMEOUT'
-            ? '⏱️ Mô hình AI phản hồi quá thời gian chờ (15s). Câu hỏi của bạn đã được lưu, vui lòng nhấn "Thử lại câu hỏi trước" bên dưới.'
-            : errCode === 'AI_SERVICE_ERROR'
-              ? '⚠️ Dịch vụ AI đang bận hoặc gặp sự cố tạm thời. Tin nhắn đã được lưu, vui lòng thử lại sau ít giây.'
-              : (err?.error?.message || 'Đã xảy ra lỗi khi kết nối với trợ lý CulinaAI. Vui lòng thử lại.');
+        const isTimeoutError =
+          errCode === 'AI_TIMEOUT' ||
+          err?.code === 'ECONNABORTED' ||
+          (err?.message && String(err.message).toLowerCase().includes('timeout'));
+
+        const errorContent = isTimeoutError
+          ? '⏱️ Quá thời gian chờ phản hồi do yêu cầu cần phân tích thực đơn kỹ lưỡng. Tin nhắn của bạn đã được lưu, vui lòng nhấn "Thử lại câu hỏi trước" bên dưới.'
+          : errCode === 'AI_SERVICE_ERROR'
+            ? '⚠️ Dịch vụ AI đang bận hoặc gặp sự cố tạm thời. Tin nhắn đã được lưu, vui lòng thử lại sau ít giây.'
+            : (err?.error?.message || err?.message || 'Đã xảy ra lỗi khi kết nối với trợ lý CulinaAI. Vui lòng thử lại.');
 
         const fallbackMsg: ChatMessage = {
           id: `bot-err-${Date.now()}`,
@@ -918,7 +948,7 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
                           : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs shadow-2xs'
                       }`}
                   >
-                    {msg.content}
+                    {cleanDisplayContent(msg.content)}
 
                     {/* CTA Buttons in bubble if limit reached */}
                     {msg.content.includes('hết lượt hỏi') && isGuest && (
@@ -1059,13 +1089,25 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
 
           {/* Loading Indicator */}
           {isLoading && (
-            <div className="flex items-start gap-2.5 animate-pulse">
-              <div className="w-7 h-7 rounded-xl bg-slate-900 text-teal-300 flex items-center justify-center text-xs">
-                <Bot className="w-4 h-4" />
+            <div className="flex items-start gap-2.5 animate-in fade-in duration-200">
+              <div className="w-7 h-7 rounded-xl bg-slate-900 text-teal-300 flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                <Bot className="w-4 h-4 animate-bounce" />
               </div>
-              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2 shadow-2xs">
-                <Sparkles className="w-4 h-4 text-teal-600 animate-spin" />
-                <span>Bếp trưởng CulinaAI đang suy nghĩ và chuẩn bị thực đơn cá nhân hóa cho bạn...</span>
+              <div className="p-3.5 bg-white rounded-2xl border border-teal-200/80 text-xs text-slate-700 flex flex-col gap-2 shadow-2xs min-w-[260px] max-w-[85%]">
+                <div className="flex items-center gap-2 font-medium text-teal-950">
+                  <Sparkles className="w-4 h-4 text-teal-600 animate-spin shrink-0" />
+                  <span className="transition-all duration-300">
+                    {loadingStep === 0 && '🔍 Đang phân tích khẩu vị & nguyên liệu...'}
+                    {loadingStep === 1 && '🍲 Đang chọn lọc món ăn & mẹo nấu...'}
+                    {loadingStep >= 2 && '✨ Đang hoàn thiện thực đơn cho bạn...'}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-teal-600 to-emerald-400 transition-all duration-700 ease-out rounded-full"
+                    style={{ width: loadingStep === 0 ? '35%' : loadingStep === 1 ? '72%' : '94%' }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1113,7 +1155,7 @@ export const ChatbotDrawer: React.FC<ChatbotDrawerProps> = ({ isFullPage = false
             placeholder={
               isGuest && guestQueriesRemaining <= 0
                 ? 'Đã hết lượt hỏi ở Chế độ Khách (vui lòng đăng ký/đăng nhập)...'
-                : 'Hỏi công thức, thực đơn cá nhân hóa hoặc nguyên liệu tủ lạnh...'
+                : 'Hỏi công thức, thực đơn cá nhân hóa hoặc nguyên liệu có sẵn...'
             }
             disabled={isLoading || (isGuest && guestQueriesRemaining <= 0)}
             className="flex-1 text-xs sm:text-sm px-4 py-2.5 rounded-2xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-700 bg-slate-50/50 disabled:bg-slate-100 disabled:text-slate-400"
