@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { authenticate } from '../middlewares/authMiddleware.js';
+import { guestChatLimiter } from '../middlewares/rateLimiter.js';
 import { sendGuestMessage, getGuestQuota } from '../controllers/guestChatController.js';
 import {
   createChatSession,
@@ -18,7 +19,7 @@ const router = Router();
 
 // ── 4.4 Chatbot Chế độ Khách (UC03) ──────────────────────────────────────────
 // 4.4.1 Gửi câu hỏi (khách) - POST /chat/guest/messages
-router.post('/guest/messages', sendGuestMessage);
+router.post('/guest/messages', guestChatLimiter, sendGuestMessage);
 
 // 5.2.1 Xem hạn mức lượt hỏi còn lại - GET /chat/guest/quota
 router.get('/guest/quota', getGuestQuota);

@@ -83,8 +83,9 @@ export const AuthPage: React.FC = () => {
       setAuthError('Mật khẩu xác nhận không khớp.');
       return;
     }
-    if (regPassword.length < 6) {
-      setAuthError('Mật khẩu cần tối thiểu 6 ký tự.');
+    const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(regPassword);
+    if (!isStrong) {
+      setAuthError('Mật khẩu cần tối thiểu 8 ký tự, gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số.');
       return;
     }
 
@@ -506,8 +507,9 @@ export const AuthPage: React.FC = () => {
                           type={showPassword ? 'text' : 'password'}
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
-                          placeholder="Tối thiểu 6 ký tự"
+                          placeholder="Tối thiểu 8 ký tự (hoa, thường, số)"
                           required
+                          minLength={8}
                           className="w-full text-xs sm:text-sm pl-10 pr-10 py-3 rounded-2xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
                         />
                         <button
@@ -518,6 +520,7 @@ export const AuthPage: React.FC = () => {
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+                      <p className="text-[11px] text-slate-500 mt-1">Yêu cầu: Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.</p>
                     </div>
 
                     <div>
@@ -734,8 +737,9 @@ export const AuthPage: React.FC = () => {
                           type={showPassword ? 'text' : 'password'}
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Tối thiểu 6 ký tự"
+                          placeholder="Tối thiểu 8 ký tự (hoa, thường, số)"
                           required
+                          minLength={8}
                           className="w-full text-xs sm:text-sm pl-10 pr-10 py-3 rounded-2xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
                         />
                         <button

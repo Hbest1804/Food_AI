@@ -3,6 +3,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { env } from './config/appConfig.js';
 import { testDbConnection } from './config/supabase.js';
 import { ensureAdminUser } from './services/adminInitService.js';
@@ -17,14 +18,20 @@ import adminRoutes from './routes/admin.js';
 
 const app = express();
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// ── Security & Middleware ─────────────────────────────────────────────────────
+// Sử dụng Helmet để thiết lập các HTTP headers bảo mật
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
 app.use(cors({
   origin: env.corsOrigin.split(',').map(o => o.trim()),
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Giới hạn dung lượng request body JSON ở mức 1MB hợp lý, tránh rủi ro DoS tràn bộ nhớ
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // ── Health-check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
@@ -36,6 +43,7 @@ app.get('/health', (_req, res) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// Chuẩn hóa toàn bộ REST API tập trung dưới tiền tố /api
 app.use('/api/auth', authRoutes);
 app.use('/api/meta', metaRoutes);
 app.use('/api/ingredients', ingredientsRoutes);
@@ -44,15 +52,6 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api', adminRoutes);
-
-// Hỗ trợ trực tiếp không tiền tố /api
-app.use('/meta', metaRoutes);
-app.use('/ingredients', ingredientsRoutes);
-app.use('/dishes', dishesRoutes);
-app.use('/chat', chatRoutes);
-app.use('/me', meRoutes);
-app.use('/ratings', ratingsRoutes);
-app.use('/', adminRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -79,11 +78,17 @@ app.use((err, _req, res, _next) => {
   }
 
   const status = typeof err.status === 'number' ? err.status : 500;
+  const isProd = env.nodeEnv === 'production';
+  // Không làm lộ stack trace hoặc thông tin CSDL nội bộ ra client khi gặp lỗi 500
+  const safeMessage = (status === 500 && isProd)
+    ? 'Đã xảy ra lỗi nội bộ phía máy chủ. Vui lòng thử lại sau.'
+    : (err.message || 'Lỗi server nội bộ');
+
   res.status(status).json({
     success: false,
     error: {
-      code: err.code || 'INTERNAL_ERROR',
-      message: err.message || 'Lỗi server nội bộ',
+      code: err.code || (status === 500 ? 'INTERNAL_ERROR' : 'ERROR'),
+      message: safeMessage,
       ...(err.details ? { details: err.details } : {}),
     },
   });

@@ -9,6 +9,18 @@ import { generateCulinaryReply } from '../services/aiService.js';
 // Lưu trữ hạn mức khách trong RAM cache (TTL 24 giờ theo đặc tả)
 // Cấu trúc: Map<guest_id, { used: number, resets_at: string, createdAt: number }>
 const guestQuotaMap = new Map();
+// Theo dõi hạn mức theo IP để chống qua mặt bằng cách đổi header X-Guest-Id
+// Cấu trúc: Map<client_ip, { used: number, resets_at: string, createdAt: number }>
+const ipQuotaMap = new Map();
+
+// Helper lấy địa chỉ IP của client
+export function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || req.ip || '127.0.0.1';
+}
 
 // Dọn dẹp cache sau mỗi 1 giờ đối với các session quá 24h
 setInterval(() => {
@@ -18,18 +30,23 @@ setInterval(() => {
       guestQuotaMap.delete(id);
     }
   }
+  for (const [ip, record] of ipQuotaMap.entries()) {
+    if (new Date(record.resets_at).getTime() <= now) {
+      ipQuotaMap.delete(ip);
+    }
+  }
 }, 60 * 60 * 1000).unref();
 
 /**
- * Lấy hoặc khởi tạo hạn mức cho một guestId
+ * Lấy hoặc khởi tạo hạn mức kết hợp giữa guestId và clientIp
  */
-function getOrCreateQuota(guestId) {
+function getOrCreateQuota(guestId, clientIp = '127.0.0.1') {
   const limit = env.guestChatLimit || 5;
   const now = new Date();
 
+  // 1. Kiểm tra hoặc tạo mới theo guestId
   let record = guestQuotaMap.get(guestId);
   if (!record || new Date(record.resets_at).getTime() <= now.getTime()) {
-    // Đặt hạn 24 giờ kể từ thời điểm tạo
     const resetsAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
     record = {
       used: 0,
@@ -39,12 +56,41 @@ function getOrCreateQuota(guestId) {
     guestQuotaMap.set(guestId, record);
   }
 
+  // 2. Kiểm tra hoặc tạo mới theo clientIp
+  let ipRecord = ipQuotaMap.get(clientIp);
+  if (!ipRecord || new Date(ipRecord.resets_at).getTime() <= now.getTime()) {
+    const resetsAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    ipRecord = {
+      used: 0,
+      resets_at: resetsAt,
+      createdAt: now.getTime(),
+    };
+    ipQuotaMap.set(clientIp, ipRecord);
+  }
+
+  // Lấy giá trị used lớn hơn giữa guestId và IP (ngăn chặn đổi ID để reset lượt dùng từ cùng 1 IP)
+  const effectiveUsed = Math.max(record.used, ipRecord.used);
+
   return {
     limit,
-    used: record.used,
-    remaining: Math.max(0, limit - record.used),
+    used: effectiveUsed,
+    remaining: Math.max(0, limit - effectiveUsed),
     resets_at: record.resets_at,
   };
+}
+
+/**
+ * Tiêu thụ 1 lượt hỏi cho cả guestId và clientIp
+ */
+function consumeQuota(guestId, clientIp = '127.0.0.1') {
+  const record = guestQuotaMap.get(guestId);
+  if (record) {
+    record.used += 1;
+  }
+  const ipRecord = ipQuotaMap.get(clientIp);
+  if (ipRecord) {
+    ipRecord.used += 1;
+  }
 }
 
 /**
@@ -56,8 +102,9 @@ export async function getGuestQuota(req, res) {
   const guestId = (typeof guestIdHeader === 'string' && guestIdHeader.trim())
     ? guestIdHeader.trim()
     : `guest_${crypto.randomUUID()}`;
+  const clientIp = getClientIp(req);
 
-  const quota = getOrCreateQuota(guestId);
+  const quota = getOrCreateQuota(guestId, clientIp);
 
   return res.status(200).json({
     success: true,
@@ -76,9 +123,10 @@ export async function sendGuestMessage(req, res, next) {
     const guestId = (typeof guestIdHeader === 'string' && guestIdHeader.trim())
       ? guestIdHeader.trim()
       : `guest_${crypto.randomUUID()}`;
+    const clientIp = getClientIp(req);
 
     // ── 2. Kiểm tra hạn mức lượt hỏi trước khi gọi AI ────────────────────────
-    const quota = getOrCreateQuota(guestId);
+    const quota = getOrCreateQuota(guestId, clientIp);
     if (quota.used >= quota.limit) {
       return res.status(429).json({
         success: false,
@@ -150,18 +198,9 @@ export async function sendGuestMessage(req, res, next) {
       dishesContext,
     });
 
-    // ── 6. Cập nhật hạn mức khách (used + 1) ──────────────────────────────────
-    const record = guestQuotaMap.get(guestId);
-    if (record) {
-      record.used += 1;
-    }
-
-    const updatedQuota = {
-      limit: quota.limit,
-      used: record ? record.used : quota.used + 1,
-      remaining: Math.max(0, quota.limit - (record ? record.used : quota.used + 1)),
-      resets_at: quota.resets_at,
-    };
+    // ── 6. Cập nhật hạn mức khách (used + 1 cho cả GuestId và IP) ─────────────
+    consumeQuota(guestId, clientIp);
+    const updatedQuota = getOrCreateQuota(guestId, clientIp);
 
     // Format dữ liệu dishes theo đặc tả: { id, name, slug, description, image_url, cook_time_minutes, difficulty }
     const formattedDishes = aiResult.dishes.map((d) => ({

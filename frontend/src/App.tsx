@@ -4,7 +4,11 @@ import { Navbar } from './components/Navbar';
 import { BrowseView } from './components/BrowseView';
 import { RecommendationsView } from './components/RecommendationsView';
 import { ChatbotDrawer } from './components/ChatbotDrawer';
-import { AdminPortal } from './components/AdminPortal';
+
+// Dynamic Import (Code-splitting) cho AdminPortal để giảm bundle size ban đầu cho người dùng thông thường
+const AdminPortal = React.lazy(() =>
+  import('./components/AdminPortal').then((m) => ({ default: m.AdminPortal }))
+);
 import { DishDetailModal } from './components/DishDetailModal';
 import { CookingFocusModeModal } from './components/CookingFocusModeModal';
 import { TasteProfileModal } from './components/TasteProfileModal';
@@ -45,7 +49,20 @@ const MainLayout: React.FC = () => {
 
   // Nếu là tài khoản Admin và đang truy cập Quản trị: Render Giao diện Quản trị riêng biệt độc lập 100% (bỏ Navbar người dùng)
   if (activeTab === 'admin' && currentUser?.role === 'admin') {
-    return <AdminPortal />;
+    return (
+      <React.Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-stone-900 text-amber-400">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm font-medium">Đang tải Cổng Quản Trị Hệ Thống...</p>
+            </div>
+          </div>
+        }
+      >
+        <AdminPortal />
+      </React.Suspense>
+    );
   }
 
   return (
@@ -64,7 +81,18 @@ const MainLayout: React.FC = () => {
         )}
         {activeTab === 'auth' && <AuthPage />}
         {activeTab === 'admin' && currentUser?.role === 'admin' && (
-          <AdminPortal />
+          <React.Suspense
+            fallback={
+              <div className="min-h-[400px] flex items-center justify-center text-stone-500">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-stone-500 border-t-transparent rounded-full animate-spin" />
+                  <span>Đang tải Admin Portal...</span>
+                </div>
+              </div>
+            }
+          >
+            <AdminPortal />
+          </React.Suspense>
         )}
         {activeTab === 'admin' && currentUser?.role !== 'admin' && (
           <div className="max-w-md mx-auto my-20 p-8 bg-white border border-stone-200 rounded-3xl text-center shadow-lg">

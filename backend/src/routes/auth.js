@@ -13,6 +13,7 @@ import {
   resetPassword,
 } from '../controllers/authController.js';
 import { authenticate } from '../middlewares/authMiddleware.js';
+import { authLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ const router = Router();
  * @access Public
  * @body   { email, password, displayName?, phone? }
  */
-router.post('/register', register);
+router.post('/register', authLimiter, register);
 
 /**
  * @route  POST /api/auth/login
@@ -30,7 +31,7 @@ router.post('/register', register);
  * @access Public
  * @body   { email, password }
  */
-router.post('/login', login);
+router.post('/login', authLimiter, login);
 
 /**
  * @route  POST /api/auth/logout
@@ -60,7 +61,7 @@ router.post('/refresh', refresh);
  * @access Public
  * @body   { email }
  */
-router.post('/forgot-password', requestPasswordReset);
+router.post('/forgot-password', authLimiter, requestPasswordReset);
 
 /**
  * @route  POST /api/auth/reset-password/verify
@@ -68,7 +69,7 @@ router.post('/forgot-password', requestPasswordReset);
  * @access Public
  * @body   { token }
  */
-router.post('/reset-password/verify', verifyPasswordReset);
+router.post('/reset-password/verify', authLimiter, verifyPasswordReset);
 
 /**
  * @route  POST /api/auth/reset-password
@@ -76,6 +77,6 @@ router.post('/reset-password/verify', verifyPasswordReset);
  * @access Public (Cần token từ email trong body)
  * @body   { token, new_password, confirm_password }
  */
-router.post('/reset-password', resetPassword);
+router.post('/reset-password', authLimiter, resetPassword);
 
 export default router;

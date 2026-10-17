@@ -16,7 +16,7 @@ for (const key of required) {
 }
 
 function normalizeGeminiModel(m) {
-  if (!m) return 'gemini-3.5-flash-lite';
+  if (!m) return 'gemini-3.8-flash';
   const cleaned = m.trim().toLowerCase().replace(/\s+/g, '-');
   return cleaned;
 }

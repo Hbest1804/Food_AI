@@ -182,15 +182,15 @@ Mâm cơm này cung cấp đầy đủ đạm, chất xơ, vitamin và khoáng c
   },
 };
 
-// ── 3. Danh sách model: CHỈ sử dụng duy nhất 2 model: gemini-3.5-flash-lite và gemini-3.1-flash-lite ──
+// ── 3. Danh sách model: Sử dụng model cấu hình và các model dự phòng khi failover ──
 function getCandidateModels() {
   const configured = env.gemini.model;
-  const allowed = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+  const fallbackList = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
 
-  if (allowed.includes(configured)) {
-    return [configured, ...allowed.filter((m) => m !== configured)];
+  if (configured) {
+    return [configured, ...fallbackList.filter((m) => m !== configured)];
   }
-  return allowed;
+  return fallbackList;
 }
 
 /**
@@ -207,7 +207,8 @@ async function callGeminiWithFailover({ prompt, maxOutputTokens = 900, temperatu
 
   for (let idx = 0; idx < models.length; idx++) {
     const model = models[idx];
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.gemini.apiKey}`;
+    // Chuyển API key sang HTTP header x-goog-api-key thay vì để trong query param URL
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const controller = new AbortController();
     // Model chính được 18s để sinh đầy đủ thực đơn, model dự phòng 10s
     const timeoutDuration = idx === 0 ? 18000 : 10000;
@@ -216,7 +217,10 @@ async function callGeminiWithFailover({ prompt, maxOutputTokens = 900, temperatu
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': env.gemini.apiKey,
+        },
         signal: controller.signal,
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],

@@ -138,17 +138,46 @@ export async function loginUser({ email, password }) {
   };
 }
 
+// Danh sách token đã bị thu hồi sau khi người dùng đăng xuất (In-memory token blacklist)
+// Cấu trúc: Map<token, expiresAtTimestamp>
+const revokedTokenMap = new Map();
+
+// Tự động dọn dẹp các token đã quá hạn trong blacklist sau mỗi 30 phút
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, exp] of revokedTokenMap.entries()) {
+    if (exp <= now) {
+      revokedTokenMap.delete(token);
+    }
+  }
+}, 30 * 60 * 1000).unref();
+
+export function revokeToken(token, expiresAt = null) {
+  if (!token || typeof token !== 'string') return;
+  const exp = expiresAt ? expiresAt * 1000 : Date.now() + 24 * 60 * 60 * 1000;
+  revokedTokenMap.set(token, exp);
+}
+
+export function isTokenRevoked(token) {
+  if (!token) return false;
+  return revokedTokenMap.has(token);
+}
+
 /**
- * Đăng xuất — vô hiệu hoá session phía Supabase.
- * accessToken cần được truyền vào để xác định session.
+ * Đăng xuất — vô hiệu hoá session phía Supabase và thu hồi token trong hệ thống.
+ * @param {string|null} accessToken
  */
 export async function logoutUser(accessToken) {
-  // Tạo client tạm với access token của user để sign out đúng session
-  const { error } = await supabase.auth.signOut();
+  if (accessToken) {
+    // 1. Đưa token vào blocklist để chặn ngay lập tức trên mọi request tiếp theo
+    revokeToken(accessToken);
 
-  if (error) {
-    // Không throw — đăng xuất phía client vẫn hoạt động
-    console.warn('Supabase signOut warning:', error.message);
+    // 2. Thu hồi session phía Supabase GoTrue Auth qua Admin API
+    try {
+      await supabaseAdmin.auth.admin.signOut(accessToken, 'global');
+    } catch (error) {
+      console.warn('Supabase admin signOut warning:', error.message);
+    }
   }
 
   return { success: true };

@@ -16,3 +16,16 @@ export function isValidEmail(email) {
 export function isStrongPassword(password) {
   return typeof password === 'string' && /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
 }
+
+/**
+ * Làm sạch từ khóa tìm kiếm trước khi truyền vào PostgREST .or() filter
+ * Loại bỏ các ký tự đặc biệt có thể thay đổi cú pháp logic truy vấn của PostgREST: , ( ) . % " ' \ { } :
+ */
+export function sanitizeSearchKeyword(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/[,().%"'\\{}:]/g, '')
+    .trim()
+    .slice(0, 100);
+}
+
